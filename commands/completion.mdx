@@ -1,0 +1,244 @@
+---
+title: pixi completion
+---
+
+Generate shell completion scripts.
+
+## Usage
+
+```bash
+pixi completion --shell <SHELL>
+```
+
+## Description
+
+The `pixi completion` command generates shell completion scripts that provide tab-completion for pixi commands, options, and arguments. The completion script includes smart completions for:
+- Task names when using `pixi run`
+- Environment names for `--environment` flag
+- Package names for various commands
+
+## Options
+
+<ParamField path="--shell" type="enum" required>
+  The shell to generate completions for.
+  
+  **Supported shells:**
+  - `bash` - Bourne Again SHell
+  - `zsh` - Z Shell
+  - `fish` - Friendly Interactive SHell
+  - `powershell` - PowerShell
+  - `elvish` - Elvish shell
+  - `nushell` - Nushell
+  
+  ```bash
+  pixi completion --shell bash
+  pixi completion --shell zsh
+  pixi completion --shell fish
+  ```
+</ParamField>
+
+## Installation
+
+### Bash
+
+Add to your `~/.bashrc`:
+
+```bash
+eval "$(pixi completion --shell bash)"
+```
+
+Or install system-wide:
+
+```bash
+pixi completion --shell bash | sudo tee /etc/bash_completion.d/pixi
+```
+
+### Zsh
+
+Add to your `~/.zshrc`:
+
+```bash
+eval "$(pixi completion --shell zsh)"
+```
+
+Or install to a directory in your `$fpath`:
+
+```bash
+pixi completion --shell zsh > ~/.zsh/completions/_pixi
+```
+
+Make sure the completion directory is in your `fpath` before compinit:
+
+```bash
+# In ~/.zshrc before compinit
+fpath=(~/.zsh/completions $fpath)
+```
+
+### Fish
+
+Install to Fish completions directory:
+
+```bash
+pixi completion --shell fish > ~/.config/fish/completions/pixi.fish
+```
+
+### PowerShell
+
+Add to your PowerShell profile:
+
+```powershell
+pixi completion --shell powershell | Out-String | Invoke-Expression
+```
+
+To find your profile location:
+
+```powershell
+$PROFILE
+```
+
+### Nushell
+
+Add to your Nushell config:
+
+```bash
+pixi completion --shell nushell | save -f ~/.config/nushell/completions/pixi.nu
+```
+
+Then source it in your `config.nu`:
+
+```nushell
+source ~/.config/nushell/completions/pixi.nu
+```
+
+### Elvish
+
+Add to your `~/.elvish/rc.elv`:
+
+```elvish
+eval (pixi completion --shell elvish | slurp)
+```
+
+## Features
+
+### Command Completion
+
+Tab-complete pixi commands:
+
+```bash
+pixi <TAB>
+# Shows: add, auth, build, clean, completion, config, exec, ...
+```
+
+### Task Completion
+
+Tab-complete task names when using `pixi run`:
+
+```bash
+pixi run <TAB>
+# Shows available tasks: test, lint, build, format, ...
+```
+
+### Environment Completion
+
+Tab-complete environment names:
+
+```bash
+pixi run --environment <TAB>
+# Shows: default, prod, test, dev, ...
+```
+
+### Option Completion
+
+Tab-complete command options:
+
+```bash
+pixi add --<TAB>
+# Shows: --help, --manifest-path, --host, --build, --pypi, ...
+```
+
+## Examples
+
+### Generate bash completions
+
+```bash
+pixi completion --shell bash
+```
+
+### Install bash completions
+
+```bash
+# For current user
+pixi completion --shell bash >> ~/.bashrc
+source ~/.bashrc
+
+# System-wide
+pixi completion --shell bash | sudo tee /etc/bash_completion.d/pixi
+```
+
+### Install zsh completions
+
+```bash
+mkdir -p ~/.zsh/completions
+pixi completion --shell zsh > ~/.zsh/completions/_pixi
+
+# Add to ~/.zshrc if not already present:
+echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+```
+
+### Install fish completions
+
+```bash
+mkdir -p ~/.config/fish/completions
+pixi completion --shell fish > ~/.config/fish/completions/pixi.fish
+```
+
+## Troubleshooting
+
+<Accordion title="Completions not working">
+  1. Make sure you've sourced your shell config after installation:
+     ```bash
+     source ~/.bashrc  # or ~/.zshrc, etc.
+     ```
+  
+  2. For zsh, ensure the completion directory is in your `$fpath` before compinit
+  
+  3. Check that the completion script was generated correctly:
+     ```bash
+     pixi completion --shell bash | head
+     ```
+</Accordion>
+
+<Accordion title="Task completion not showing tasks">
+  Task completion requires:
+  - Being inside a pixi workspace
+  - Having a valid `pixi.toml` with tasks defined
+  - The workspace being initialized (`pixi install`)
+  
+  Try:
+  ```bash
+  cd /path/to/pixi-workspace
+  pixi run <TAB>
+  ```
+</Accordion>
+
+<Accordion title="Zsh: command not found: compdef">
+  Make sure you have compinit loaded in your `.zshrc`:
+  ```bash
+  autoload -Uz compinit && compinit
+  ```
+</Accordion>
+
+## Implementation Details
+
+The completion script provides intelligent context-aware completions:
+
+- **Dynamic task completion**: Reads tasks from `pixi.toml` in real-time
+- **Environment completion**: Lists available environments from the workspace
+- **Platform completion**: Suggests valid platform identifiers
+- **Path completion**: Automatically completes file paths where appropriate
+
+## Related Commands
+
+- [`pixi run`](/commands/run) - Benefits from task name completion
+- [`pixi task`](/commands/task) - Task completion shows these tasks

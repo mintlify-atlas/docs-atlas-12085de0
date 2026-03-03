@@ -1,0 +1,292 @@
+---
+title: pixi clean
+---
+
+Clean parts of your system touched by pixi.
+
+## Usage
+
+```bash
+pixi clean [OPTIONS] [COMMAND]
+```
+
+## Description
+
+The `pixi clean` command removes cached data and environments. It can clean:
+- Workspace environments (`.pixi` folder)
+- System-wide cache (conda packages, PyPI wheels, repodata, etc.)
+- Build-related caches
+
+## Subcommands
+
+### `pixi clean cache`
+
+Clean the global cache directory.
+
+```bash
+pixi clean cache [OPTIONS]
+```
+
+## Options
+
+### Workspace Options
+
+<ParamField path="--environment" type="string">
+  The specific environment directory to remove.
+  
+  ```bash
+  pixi clean --environment prod
+  pixi clean --environment test
+  ```
+</ParamField>
+
+<ParamField path="--activation-cache" type="boolean">
+  Only remove the activation cache.
+  
+  ```bash
+  pixi clean --activation-cache
+  pixi clean --environment prod --activation-cache
+  ```
+</ParamField>
+
+<ParamField path="--build" type="boolean">
+  Only remove the pixi-build cache.
+  
+  ```bash
+  pixi clean --build
+  ```
+</ParamField>
+
+### Cache Options
+
+<ParamField path="--pypi" type="boolean">
+  Clean only the PyPI related cache.
+  
+  ```bash
+  pixi clean cache --pypi
+  ```
+</ParamField>
+
+<ParamField path="--conda" type="boolean">
+  Clean only the conda related cache.
+  
+  ```bash
+  pixi clean cache --conda
+  ```
+</ParamField>
+
+<ParamField path="--repodata" type="boolean">
+  Clean only the repodata cache.
+  
+  ```bash
+  pixi clean cache --repodata
+  ```
+</ParamField>
+
+<ParamField path="--mapping" type="boolean">
+  Clean only the conda-pypi mapping cache.
+  
+  ```bash
+  pixi clean cache --mapping
+  ```
+</ParamField>
+
+<ParamField path="--exec" type="boolean">
+  Clean only the exec cache (cached command executions).
+  
+  ```bash
+  pixi clean cache --exec
+  ```
+</ParamField>
+
+<ParamField path="--build-backends" type="boolean">
+  Clean only the build backends environments cache.
+  
+  ```bash
+  pixi clean cache --build-backends
+  ```
+</ParamField>
+
+<ParamField path="--build" type="boolean">
+  Clean only the build-related cache (git, work directories, built packages).
+  
+  ```bash
+  pixi clean cache --build
+  ```
+</ParamField>
+
+<ParamField path="--yes" type="boolean">
+  Answer yes to all prompts. Useful for automation.
+  
+  ```bash
+  pixi clean cache --yes
+  pixi clean cache -y
+  ```
+</ParamField>
+
+## Examples
+
+### Clean workspace environments
+
+Remove all environments in the current workspace:
+
+```bash
+pixi clean
+```
+
+This removes:
+- Environment directories (`.pixi/envs/`)
+- Solve group environments
+- Task cache
+- Activation cache
+- Workspace build cache
+
+### Clean specific environment
+
+Remove only one environment:
+
+```bash
+pixi clean --environment test
+```
+
+### Clean activation cache only
+
+Remove just the activation cache without removing environments:
+
+```bash
+pixi clean --activation-cache
+```
+
+### Clean all cache
+
+Remove all cached data (interactive prompt):
+
+```bash
+pixi clean cache
+```
+
+### Clean specific cache types
+
+Remove only PyPI cache:
+
+```bash
+pixi clean cache --pypi
+```
+
+Remove conda package cache:
+
+```bash
+pixi clean cache --conda
+```
+
+Remove repodata cache to force refresh:
+
+```bash
+pixi clean cache --repodata
+```
+
+### Clean multiple cache types
+
+Combine flags to clean specific caches:
+
+```bash
+pixi clean cache --pypi --conda
+pixi clean cache --repodata --mapping
+```
+
+### Clean build caches
+
+Remove build-related caches:
+
+```bash
+# Clean build backends
+pixi clean cache --build-backends
+
+# Clean all build cache
+pixi clean cache --build
+
+# Clean workspace build cache
+pixi clean --build
+```
+
+### Non-interactive cleaning
+
+Clean without confirmation prompts:
+
+```bash
+pixi clean cache --yes
+pixi clean cache -y
+```
+
+## Cache Locations
+
+By default, pixi caches data in:
+
+- **Linux**: `~/.cache/rattler/`
+- **macOS**: `~/Library/Caches/rattler/`
+- **Windows**: `%LOCALAPPDATA%\rattler\Cache`
+
+Cache structure:
+```
+~/.cache/rattler/
+├── cache/                  # Conda package cache (--conda)
+├── pkgs/                   # PyPI wheels cache (--pypi)
+├── repodata/               # Channel repodata (--repodata)
+├── pypi-mapping/           # Conda-PyPI name mapping (--mapping)
+├── envs/                   # Exec cache (--exec)
+├── build-tool-envs/        # Build backends (--build-backends)
+├── git/                    # Git repos for builds (--build)
+├── build-work/             # Build work directories (--build)
+└── built-packages/         # Built packages (--build)
+```
+
+## When to Clean
+
+<Accordion title="Disk space issues">
+  The cache can grow large over time. Use `pixi info --extended` to check cache size, then clean unused caches.
+</Accordion>
+
+<Accordion title="Corrupt cache">
+  If you encounter strange package resolution or download errors, cleaning the repodata cache can help:
+  ```bash
+  pixi clean cache --repodata
+  ```
+</Accordion>
+
+<Accordion title="Fresh environment">
+  To recreate environments from scratch:
+  ```bash
+  pixi clean
+  pixi install
+  ```
+</Accordion>
+
+<Accordion title="Build issues">
+  If builds are failing or producing unexpected results:
+  ```bash
+  pixi clean cache --build
+  pixi clean --build
+  ```
+</Accordion>
+
+<Accordion title="Package resolution changes">
+  After changing channels or updating package sources:
+  ```bash
+  pixi clean cache --repodata --mapping
+  ```
+</Accordion>
+
+## Safety
+
+<Warning>
+  Cleaning the cache will cause packages to be re-downloaded on next install. This is safe but may take time depending on your internet connection.
+</Warning>
+
+<Info>
+  Cleaning workspace environments does not affect the lock file. Running `pixi install` will recreate the environments from the lock file.
+</Info>
+
+## Related Commands
+
+- [`pixi info`](/commands/info) - View cache sizes with `--extended`
+- [`pixi install`](/commands/install) - Recreate environments after cleaning

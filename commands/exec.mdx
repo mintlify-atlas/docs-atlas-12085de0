@@ -1,0 +1,218 @@
+---
+title: pixi exec
+description: Run a command in a temporary environment
+---
+
+Runs a command in a temporary environment, installing the required packages on-the-fly. This is useful for running tools without permanently installing them.
+
+The temporary environments are cached and can be removed with `pixi clean cache --exec`.
+
+## Usage
+
+```bash
+pixi exec [OPTIONS] <COMMAND>...
+```
+
+**Alias:** `pixi x`
+
+## Arguments
+
+<ParamField path="COMMAND" type="string" required>
+  The executable to run, followed by any arguments.
+  
+  If no package specs are provided with `--spec`, pixi will attempt to guess the package name from the command.
+</ParamField>
+
+## Options
+
+<ParamField path="--spec" type="string" shorthand="s">
+  Matchspecs of packages to install.
+  
+  If this is not provided, the package is guessed from the command name.
+  
+  Can be specified multiple times.
+</ParamField>
+
+<ParamField path="--with" type="string" shorthand="w">
+  Matchspecs of packages to install, while also guessing a package from the command.
+  
+  This option allows you to specify additional dependencies alongside the auto-guessed package.
+  
+  Cannot be used together with `--spec`.
+</ParamField>
+
+<ParamField path="--channel" type="string" shorthand="c">
+  The channels to consider as a name or a URL. Multiple channels can be specified by using this field multiple times.
+  
+  When specifying a channel, it is common that the selected channel also depends on the `conda-forge` channel.
+  
+  By default, if no channel is provided, `conda-forge` is used.
+</ParamField>
+
+<ParamField path="--platform" type="string" shorthand="p">
+  The platform to create the environment for. Defaults to the current platform.
+</ParamField>
+
+<ParamField path="--force-reinstall" type="boolean">
+  If specified, a new environment is always created even if one already exists.
+</ParamField>
+
+<ParamField path="--list" type="string">
+  Before executing the command, list packages in the environment.
+  
+  Specify `--list=some_regex` to filter the shown packages.
+</ParamField>
+
+<ParamField path="--no-modify-ps1" type="boolean">
+  Disable modification of the PS1 prompt to indicate the temporary environment.
+</ParamField>
+
+## Examples
+
+### Run a command with auto-guessed package
+
+```bash
+pixi exec python --version
+```
+
+This will install Python in a temporary environment and run `python --version`.
+
+### Run a command with specific package versions
+
+```bash
+pixi exec --spec python==3.12 python script.py
+```
+
+### Run a command with multiple packages
+
+```bash
+pixi exec --spec jupyter --spec polars jupyter lab
+```
+
+### Run with additional dependencies
+
+```bash
+pixi exec --with polars jupyter lab
+```
+
+This installs both `jupyter` (guessed from the command) and `polars` (specified with `--with`).
+
+### Use a specific channel
+
+```bash
+pixi exec --channel conda-forge --channel bioconda samtools --version
+```
+
+### Force reinstall
+
+```bash
+pixi exec --force-reinstall python script.py
+```
+
+### List packages before execution
+
+```bash
+pixi exec --list python --version
+```
+
+List only specific packages:
+```bash
+pixi exec --list="numpy.*" python script.py
+```
+
+### Cross-platform execution
+
+```bash
+# On macOS ARM, run a tool for x86_64
+pixi exec --platform osx-64 some-tool
+```
+
+## How It Works
+
+1. **Package Resolution**: If `--spec` is not provided, pixi guesses the package name from the command
+2. **Environment Creation**: Pixi creates (or reuses) a cached environment with the required packages
+3. **Execution**: The command runs in the activated environment
+4. **Caching**: The environment is cached for future use
+
+<Note>
+  Temporary environments are stored in the pixi cache directory and are reused across invocations with the same dependencies.
+</Note>
+
+## Environment Naming
+
+Temporary environments are named based on:
+- The command name
+- The package specifications
+- The channels used
+- The target platform
+
+The same environment is reused for identical combinations.
+
+## Cleaning Up
+
+Remove all temporary exec environments:
+
+```bash
+pixi clean cache --exec
+```
+
+## Use Cases
+
+### One-off Commands
+
+```bash
+# Run a tool without installing it globally
+pixi exec cowpy "Hello World"
+```
+
+### Testing Different Versions
+
+```bash
+pixi exec --spec python==3.8 python --version
+pixi exec --spec python==3.12 python --version
+```
+
+### Quick Scripts
+
+```bash
+pixi exec --spec "python==3.12" --with "requests" python -c "import requests; print(requests.get('https://api.github.com').json())"
+```
+
+### CI/CD
+
+```yaml
+# In GitHub Actions
+- name: Run tool
+  run: pixi exec cowpy "Build successful!"
+```
+
+## Package Guessing
+
+When you don't specify `--spec`, pixi attempts to guess the package name:
+
+```bash
+pixi exec python --version  # Guesses package name: python
+pixi exec jupyter lab       # Guesses package name: jupyter
+```
+
+Illegal characters in the command are replaced with dashes.
+
+<Tip>
+  Use `pixi x` as a shorthand for `pixi exec`.
+</Tip>
+
+## Differences from `pixi run`
+
+| Feature | `pixi exec` | `pixi run` |
+|---------|-------------|------------|
+| Scope | Temporary environment | Project environment |
+| Package source | Specified via CLI | From `pixi.toml` |
+| Caching | Automatic | N/A |
+| Use case | One-off commands | Project tasks |
+
+## Environment Variables
+
+The temporary environment sets:
+- `PIXI_ENVIRONMENT_NAME`: `temp:<package-names>`
+- `PS1` or `_PIXI_PROMPT`: Modified prompt (unless `--no-modify-ps1`)
+- All standard conda environment variables

@@ -1,0 +1,608 @@
+---
+title: Installing and Managing Global Tools
+description: Learn how to install and manage command-line tools globally with pixi global, making them available system-wide.
+---
+
+Learn how to install and manage command-line tools globally with `pixi global`, making development tools available system-wide without environment conflicts.
+
+## What are Global Tools?
+
+Global tools are command-line applications installed system-wide, available from any directory. With `pixi global`, you can:
+
+- Install tools in isolated environments
+- Avoid dependency conflicts between tools
+- Share tools across all your projects
+- Install GUI applications with start menu entries
+
+<Tip>
+`pixi global` is similar to `pipx` for Python tools, but works with any conda package.
+</Tip>
+
+## Basic Installation
+
+<Steps>
+
+### Install a Single Tool
+
+Install a tool with a single command:
+
+```bash
+pixi global install rattler-build
+```
+
+This installs `rattler-build` in an isolated environment and exposes its executable to your system PATH.
+
+**Verify the installation:**
+
+```bash
+rattler-build --version
+```
+
+### Check Installed Tools
+
+List all globally installed tools:
+
+```bash
+pixi global list
+```
+
+**Example Output:**
+
+```
+Environment: rattler-build
+  Package         Version    Channel
+  rattler-build   0.18.0     conda-forge
+  Exposed:
+    - rattler-build
+```
+
+### Uninstall a Tool
+
+Remove a tool when no longer needed:
+
+```bash
+pixi global remove rattler-build
+```
+
+</Steps>
+
+## Isolated Environments
+
+By default, each tool gets its own environment, preventing dependency conflicts:
+
+```bash
+# Each tool in its own environment
+pixi global install git
+pixi global install vim
+pixi global install ripgrep
+```
+
+This creates separate environments:
+
+```
+~/.pixi/envs/
+├── git/
+├── vim/
+└── ripgrep/
+```
+
+<Tip>
+Isolation means removing one tool never breaks another, unlike traditional package managers.
+</Tip>
+
+## Installing Tools Together
+
+### Tools with Dependencies
+
+Sometimes tools work better together. Install multiple tools in one environment:
+
+```bash
+pixi global install ipython --with numpy --with matplotlib
+```
+
+This installs:
+- `ipython` (exposed to PATH)
+- `numpy` (available in ipython, not exposed)
+- `matplotlib` (available in ipython, not exposed)
+
+**Test it works:**
+
+```bash
+ipython -c 'import numpy; import matplotlib; print("Success!")'
+```
+
+**Expected Output:**
+
+```
+Success!
+```
+
+### Data Science Environment
+
+Create a complete data science environment:
+
+```bash
+pixi global install --environment data-science \
+  --expose jupyter \
+  --expose ipython \
+  jupyter numpy pandas matplotlib ipython scikit-learn
+```
+
+This creates one environment with multiple exposed tools:
+
+```bash
+jupyter lab
+ipython
+```
+
+## Managing Multiple Versions
+
+### Install Different Versions
+
+Install multiple versions of the same tool:
+
+```bash
+# Python 3.11
+pixi global install --expose py311=python "python=3.11"
+
+# Python 3.12
+pixi global install --expose py312=python "python=3.12"
+
+# Python 3.13
+pixi global install --expose py313=python "python=3.13"
+```
+
+Now you can use any version:
+
+```bash
+py311 --version  # Python 3.11.x
+py312 --version  # Python 3.12.x
+py313 --version  # Python 3.13.x
+```
+
+### Custom Executable Names
+
+Expose tools under custom names:
+
+```bash
+pixi global install --expose bird=bat bat
+```
+
+Now run `bat` as `bird`:
+
+```bash
+bird --version
+```
+
+## Installing from Source
+
+### From Local Directory
+
+Install a package from local source:
+
+```bash
+pixi global install --path /path/to/my-tool
+```
+
+The directory must contain a `pixi.toml` or `pyproject.toml` with package metadata:
+
+```toml
+[package]
+name = "my-tool"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-cmake", version = "*" }
+```
+
+### From Git Repository
+
+Install directly from a Git repository:
+
+```bash
+pixi global install --git https://github.com/org/tool.git
+```
+
+Install from a specific branch:
+
+```bash
+pixi global install --git https://github.com/org/tool.git --branch develop
+```
+
+### Multi-Output Packages
+
+If a source has multiple outputs, specify which one:
+
+```bash
+pixi global install --path /path/to/package foobar
+```
+
+## Installing Multiple Tools
+
+### Install Several Tools at Once
+
+Install multiple independent tools:
+
+```bash
+pixi global install pixi-pack rattler-build ruff
+```
+
+This creates separate environments for each:
+
+```toml
+[envs.pixi-pack]
+channels = ["conda-forge"]
+dependencies = { pixi-pack = "*" }
+exposed = { pixi-pack = "pixi-pack" }
+
+[envs.rattler-build]
+channels = ["conda-forge"]
+dependencies = { rattler-build = "*" }
+exposed = { rattler-build = "rattler-build" }
+
+[envs.ruff]
+channels = ["conda-forge"]
+dependencies = { ruff = "*" }
+exposed = { ruff = "ruff" }
+```
+
+### Create a Development Environment
+
+Install all your development tools together:
+
+```bash
+pixi global install --environment dev \
+  --expose git \
+  --expose vim \
+  --expose code \
+  git vim vscode ripgrep fd
+```
+
+## Platform-Specific Installation
+
+### Cross-Platform Tools
+
+Install tools for a different platform:
+
+```bash
+# On ARM Mac, install x86_64 version
+pixi global install --platform osx-64 python
+```
+
+The manifest shows the platform:
+
+```toml
+[envs.python]
+channels = ["conda-forge"]
+platforms = ["osx-64"]
+dependencies = { python = "*" }
+```
+
+## Shell Completions
+
+### Enable Completions
+
+When you install tools via `pixi global`, completions are automatically installed to `$PIXI_HOME/completions`.
+
+<Tabs>
+<Tab title="Bash">
+
+Add to `~/.bashrc`:
+
+```bash
+for file in ~/.pixi/completions/bash/*; do
+    [ -e "$file" ] && source "$file"
+done
+```
+
+</Tab>
+<Tab title="Zsh">
+
+Add to `~/.zshrc`:
+
+```zsh
+fpath+=(~/.pixi/completions/zsh)
+autoload -Uz compinit
+compinit
+```
+
+</Tab>
+<Tab title="Fish">
+
+Add to `~/.config/fish/config.fish`:
+
+```fish
+for file in ~/.pixi/completions/fish/*
+    source $file
+end
+```
+
+</Tab>
+</Tabs>
+
+**Restart your shell or source the config file:**
+
+```bash
+source ~/.bashrc  # or ~/.zshrc or ~/.config/fish/config.fish
+```
+
+<Note>
+Completions are only installed for tools whose binaries are exposed under their original names.
+</Note>
+
+## Managing Environments
+
+### Add Dependencies to Environment
+
+Add packages to an existing environment:
+
+```bash
+pixi global add --environment data-science seaborn plotly
+```
+
+This adds dependencies without auto-exposing their executables.
+
+### Remove Dependencies
+
+Remove packages from an environment:
+
+```bash
+pixi global remove --environment data-science plotly
+```
+
+### View Environment Details
+
+See what's in an environment:
+
+```bash
+pixi global list
+```
+
+## The Global Manifest
+
+### Manifest Location
+
+The global manifest stores all your installed tools:
+
+- Linux/macOS: `~/.pixi/manifests/pixi-global.toml`
+- Windows: `%USERPROFILE%\.pixi\manifests\pixi-global.toml`
+
+Find your manifest location:
+
+```bash
+pixi info
+```
+
+### Manifest Structure
+
+Example manifest:
+
+```toml
+version = 1
+
+[envs.rattler-build]
+channels = ["conda-forge"]
+dependencies = { rattler-build = "*" }
+exposed = { rattler-build = "rattler-build" }
+
+[envs.ipython]
+channels = ["conda-forge"]
+dependencies = { ipython = "*", numpy = "*", matplotlib = "*" }
+exposed = { ipython = "ipython", ipython3 = "ipython3" }
+
+[envs.python]
+channels = ["conda-forge"]
+dependencies = { python = "3.12.*" }
+exposed = { py3 = "python" }
+```
+
+### Share Your Manifest
+
+You can:
+- Check the manifest into version control
+- Share it with team members
+- Edit it directly (then run `pixi global sync`)
+
+```bash
+# After editing the manifest
+pixi global sync
+```
+
+## GUI Applications
+
+### Install Applications with GUIs
+
+Some packages include GUI applications:
+
+```bash
+pixi global install mss
+```
+
+This:
+- Installs the application
+- Creates start menu entries (Windows/Linux)
+- Adds to Launchpad (macOS)
+
+The manifest includes:
+
+```toml
+[envs.mss]
+channels = ["conda-forge"]
+dependencies = { mss = "*" }
+shortcuts = ["mss"]
+```
+
+## Advanced Usage
+
+### Custom Channels
+
+Install from specific channels:
+
+```bash
+pixi global install --channel conda-forge --channel bioconda snakemake
+```
+
+### Version Constraints
+
+Specify exact versions:
+
+```bash
+pixi global install "python<3.12"
+pixi global install "nodejs=20"
+pixi global install "gcc=12.3.0"
+```
+
+### Nested Executables
+
+Some tools have executables in subdirectories:
+
+```bash
+pixi global install dotnet --expose dotnet=dotnet\\dotnet
+```
+
+## Common Use Cases
+
+### Development Tools
+
+Install your essential development tools:
+
+```bash
+pixi global install git gh ripgrep fd bat exa
+pixi global install --environment python-tools ruff mypy black isort
+```
+
+### Build Tools
+
+Install build and packaging tools:
+
+```bash
+pixi global install cmake ninja meson
+pixi global install rattler-build pixi-pack
+```
+
+### Data Science Tools
+
+Install data science environments:
+
+```bash
+pixi global install --environment jupyter \
+  --expose jupyter \
+  --expose ipython \
+  jupyter ipython numpy pandas matplotlib scikit-learn
+```
+
+### Language Servers
+
+Install language servers for your editor:
+
+```bash
+pixi global install pyright
+pixi global install rust-analyzer
+pixi global install typescript-language-server
+```
+
+## Complete Example
+
+Here's a complete setup for a Python developer:
+
+```bash
+# Version control
+pixi global install git gh
+
+# Python tools
+pixi global install --environment python-tools \
+  --expose ruff \
+  --expose black \
+  --expose mypy \
+  ruff black mypy isort
+
+# Multiple Python versions
+pixi global install --expose py311=python "python=3.11"
+pixi global install --expose py312=python "python=3.12"
+pixi global install --expose py313=python "python=3.13"
+
+# Data science environment
+pixi global install --environment jupyter \
+  --expose jupyter \
+  --expose ipython \
+  jupyter ipython numpy pandas matplotlib scikit-learn
+
+# Modern CLI tools
+pixi global install ripgrep fd bat exa
+
+# Build tools
+pixi global install rattler-build pixi-pack
+```
+
+## Best Practices
+
+<Tip>
+**Use environments for related tools:**
+Group tools that work together (like jupyter + numpy) in one environment.
+</Tip>
+
+<Tip>
+**Keep unrelated tools separate:**
+Tools that don't interact should be in separate environments to avoid conflicts.
+</Tip>
+
+<Tip>
+**Version your manifest:**
+Commit your global manifest to a dotfiles repository for easy setup on new machines.
+</Tip>
+
+<Tip>
+**Use expose for multiple versions:**
+Install different versions of tools using custom exposed names.
+</Tip>
+
+## Troubleshooting
+
+### Tool Not Found
+
+If a tool isn't found after installation:
+
+1. Check if it was exposed:
+   ```bash
+   pixi global list
+   ```
+
+2. Verify your PATH includes Pixi's bin directory:
+   ```bash
+   echo $PATH | grep pixi
+   ```
+
+3. Restart your shell
+
+### Dependency Conflicts
+
+If tools have conflicting dependencies, install them in separate environments:
+
+```bash
+# Instead of this (might conflict)
+pixi global install tool-a tool-b
+
+# Do this
+pixi global install tool-a
+pixi global install tool-b
+```
+
+### Update All Tools
+
+Update all globally installed tools:
+
+```bash
+pixi global update
+```
+
+Update a specific environment:
+
+```bash
+pixi global update --environment python-tools
+```
+
+## Next Steps
+
+- Learn about [Python development](/tutorials/python) with Pixi
+- Set up [multi-environment workspaces](/tutorials/multi-environment)
+- Explore [pyproject.toml integration](/tutorials/pyproject-toml)

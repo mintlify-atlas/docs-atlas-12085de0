@@ -1,0 +1,544 @@
+---
+title: Tasks
+description: Task system and workflow management in Pixi
+---
+
+Pixi's task system allows you to define, organize, and run commands in your workspace. Tasks handle everything from building and testing to deployment, making complex workflows simple and reproducible.
+
+## Quick Start
+
+Define tasks in your `pixi.toml`:
+
+```toml
+[tasks]
+# Simple command
+hello = "echo 'Hello, World!'"
+
+# Command with description
+build = { cmd = "cmake --build .build", description = "Build the project" }
+
+# Task with dependencies
+test = { cmd = "pytest", depends-on = ["build"] }
+
+# Using environment variables
+run = "python main.py $PIXI_PROJECT_ROOT"
+
+# Cross-platform file operations
+copy = "cp pixi.toml pixi_backup.toml"
+clean = "rm pixi_backup.toml"
+```
+
+Run tasks with:
+
+```bash
+pixi run hello
+pixi run test
+```
+
+## Task Dependencies
+
+Tasks can depend on other tasks, creating complete pipelines:
+
+```toml
+[tasks]
+configure = "cmake -G Ninja -S . -B .build"
+build = { cmd = "ninja -C .build", depends-on = ["configure"] }
+start = { cmd = ".build/bin/app", depends-on = ["build"] }
+```
+
+When you run `pixi run start`:
+1. First `configure` runs (no dependencies)
+2. Then `build` runs (depends on configure)
+3. Finally `start` runs (depends on build)
+
+<Warning>
+If any task fails (exits with non-zero code), the pipeline stops and subsequent tasks won't run.
+</Warning>
+
+### Shorthand Syntax for Aliases
+
+Create task aliases that run multiple tasks:
+
+```toml
+[tasks]
+fmt = "ruff format"
+lint = "ruff check"
+
+# Alias that runs both
+style = ["fmt", "lint"]
+```
+
+Run both with a single command:
+
+```bash
+pixi run style
+```
+
+### Cross-Environment Dependencies
+
+Run dependent tasks in different environments:
+
+```toml
+[feature.test.tasks]
+test = "pytest"
+
+[feature.py311.dependencies]
+python = "3.11.*"
+
+[feature.py312.dependencies]
+python = "3.12.*"
+
+[tasks]
+test-all = [
+  { task = "test", environment = "py311" },
+  { task = "test", environment = "py312" }
+]
+
+[environments]
+py311 = ["py311", "test"]
+py312 = ["py312", "test"]
+```
+
+```bash
+# Tests in both Python 3.11 and 3.12
+pixi run test-all
+```
+
+<Tip>
+The environment specified in task dependencies takes precedence over the `--environment` CLI flag.
+</Tip>
+
+## Working Directory
+
+Specify where a task runs using `cwd`:
+
+```toml
+[tasks]
+bar = { cmd = "python bar.py", cwd = "scripts" }
+```
+
+The path is relative to your workspace root (where `pixi.toml` lives).
+
+## Default Environment
+
+Set which environment runs a task by default:
+
+```toml
+[feature.test.dependencies]
+pytest = "*"
+
+[tasks]
+test = { cmd = "pytest", default-environment = "test" }
+
+[environments]
+test = ["test"]
+```
+
+Override with the `--environment` flag:
+
+```bash
+pixi run -e other_environment test
+```
+
+## Task Arguments
+
+Make tasks reusable with arguments:
+
+```toml
+[tasks]
+# Required argument
+greet = { 
+  cmd = "echo Hello, {{ name }}!", 
+  args = ["name"] 
+}
+
+# Optional argument with default
+build = { 
+  cmd = "echo Building {{ project }} in {{ mode }} mode",
+  args = [
+    { arg = "project", default = "my-app" },
+    { arg = "mode", default = "development" }
+  ]
+}
+
+# Argument with choices
+compile = {
+  cmd = "echo 'Compiling in {{ mode }} mode'",
+  args = [{ arg = "mode", choices = ["debug", "release"] }]
+}
+```
+
+Use them:
+
+```bash
+# Required argument
+pixi run greet John
+# Output: Hello, John!
+
+# Using defaults
+pixi run build
+# Output: Building my-app in development mode
+
+# Overriding defaults
+pixi run build my-project production
+# Output: Building my-project in production mode
+
+# Restricted choices
+pixi run compile debug
+# Output: Compiling in debug mode
+
+pixi run compile fast
+# Error: got 'fast' for argument 'mode', choose from: debug, release
+```
+
+<Note>
+Argument names cannot contain dashes (`-`) - use underscores (`_`) or camelCase instead.
+</Note>
+
+### Passing Extra Arguments
+
+Use `--` to pass additional flags to the command:
+
+```toml
+[tasks.test]
+cmd = "pytest {{ target }} -v"
+args = [{ arg = "target", default = "tests/unit" }]
+```
+
+```bash
+# Pass extra flags after --
+pixi run test tests/integration -- --tb=short --maxfail=5
+# Runs: pytest tests/integration -v --tb=short --maxfail=5
+
+# Use default argument, pass extra flags
+pixi run test -- --maxfail=5
+# Runs: pytest tests/unit -v --maxfail=5
+```
+
+### Arguments in Dependencies
+
+Pass arguments to dependent tasks:
+
+```toml
+[tasks]
+install = {
+  cmd = "echo Installing with {{ manifest }} and flag {{ flag }}",
+  args = [
+    { arg = "manifest", default = "/path/to/manifest" },
+    { arg = "flag", default = "--debug" }
+  ]
+}
+
+deploy = {
+  cmd = "echo Deploying",
+  depends-on = [{
+    task = "install",
+    args = [{ manifest = "/custom/path" }, { flag = "--verbose" }]
+  }]
+}
+```
+
+## MiniJinja Templating
+
+Task commands support [MiniJinja](https://docs.rs/minijinja/latest/minijinja/) templating for dynamic values:
+
+```toml
+[tasks]
+# Use arguments
+greet = { cmd = "echo Hello, {{ name }}!", args = ["name"] }
+
+# String transformations
+uppercase = { 
+  cmd = "echo {{ text | upper }}", 
+  args = ["text"] 
+}
+
+# Conditionals
+install = { 
+  cmd = "{% if pixi.is_win %}install.bat{% else %}./install.sh{% endif %}",
+  args = []
+}
+
+# Platform-specific
+build = { 
+  cmd = "cargo build --target {{ pixi.platform }}",
+  args = []
+}
+```
+
+### Pixi Variables
+
+Pixi automatically provides system variables in templates:
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `pixi.platform` | Platform name | `linux-64`, `osx-arm64`, `win-64` |
+| `pixi.environment.name` | Current environment | `default`, `prod`, `test` |
+| `pixi.manifest_path` | Absolute path to pixi.toml | `/path/to/project/pixi.toml` |
+| `pixi.version` | Pixi version | `0.59.0` |
+| `pixi.init_cwd` | Directory where pixi was invoked | `/path/to/cwd` |
+| `pixi.is_win` | Is Windows | `true` or `false` |
+| `pixi.is_unix` | Is Unix-like | `true` or `false` |
+| `pixi.is_linux` | Is Linux | `true` or `false` |
+| `pixi.is_osx` | Is macOS | `true` or `false` |
+
+Example usage:
+
+```toml
+[tasks]
+# Platform-specific commands
+download = { 
+  cmd = "curl -O https://example.com/binary-{{ pixi.platform }}.tar.gz",
+  args = []
+}
+
+# Conditional execution
+install = { 
+  cmd = "{% if pixi.is_win %}install.bat{% else %}./install.sh{% endif %}",
+  args = []
+}
+
+# Environment-aware
+deploy = { 
+  cmd = "deploy.sh --env {{ pixi.environment.name }}",
+  args = []
+}
+```
+
+<Info>
+Templating only works for tasks defined in your manifest. Use `pixi run --templated` for ad-hoc CLI commands.
+</Info>
+
+## Task Names
+
+Task naming rules:
+
+- No spaces allowed
+- Must be unique
+- Names starting with `_` are **hidden** from `pixi task list`
+
+```toml
+[tasks]
+public = "echo Visible"
+_private = "echo Hidden from list"
+_helper = "echo Also hidden"
+```
+
+Hidden tasks are useful for internal tasks that users don't need to see.
+
+## Caching
+
+Specify `inputs` and `outputs` to cache task results:
+
+```toml
+[tasks]
+configure = {
+  cmd = "cmake -S . -B .build",
+  inputs = ["CMakeLists.txt"],
+  outputs = [".build/CMakeFiles/"]
+}
+
+build = {
+  cmd = "cmake --build .build",
+  depends-on = ["configure"],
+  inputs = ["CMakeLists.txt", "src/*"],
+  outputs = [".build/bin/app"]
+}
+```
+
+Pixi caches results when:
+- No packages in the environment have changed
+- Input files haven't changed (compared by fingerprint)
+- Output files exist and haven't been modified
+- The command is the same
+
+<Tip>
+Use `pixi run -v` to see which files are selected by glob patterns for debugging.
+</Tip>
+
+### Template Variables in Inputs/Outputs
+
+```toml
+[tasks]
+process = {
+  cmd = "python process.py {{ input_file }} {{ output_file }}",
+  args = [
+    { arg = "input_file", default = "data.csv" },
+    { arg = "output_file", default = "output.csv" }
+  ],
+  inputs = ["{{ input_file }}"],
+  outputs = ["{{ output_file }}"]
+}
+```
+
+```bash
+# First run processes the file
+pixi run process data1.csv output1.csv
+
+# Second run with same arguments uses cache
+pixi run process data1.csv output1.csv  # [cache hit]
+
+# Different arguments process new files
+pixi run process data2.csv output2.csv
+```
+
+## Environment Variables
+
+Set environment variables for tasks:
+
+```toml
+[tasks]
+deploy = { 
+  cmd = "echo Deploying to $DEPLOY_ENV",
+  env = { DEPLOY_ENV = "production", DEBUG = "false" }
+}
+```
+
+<Info>
+Values in `tasks.<name>.env` are interpreted by the task shell, so shell expansions like `env = { VAR = "$FOO" }` work cross-platform.
+</Info>
+
+## Clean Environment
+
+Run tasks in an isolated environment with minimal variables:
+
+```toml
+[tasks]
+isolated = { 
+  cmd = "python run_in_isolated_env.py",
+  clean-env = true 
+}
+```
+
+Or from the command line:
+
+```bash
+pixi run --clean-env my-task
+```
+
+<Warning>
+`clean-env` is not supported on Windows due to system dependencies and compiler requirements.
+</Warning>
+
+## Task Runner: deno_task_shell
+
+Pixi uses [`deno_task_shell`](https://deno.land/manual@v1.35.0/tools/task_runner) for cross-platform task execution. It's a limited Bourne shell implementation that works on Windows, macOS, and Linux.
+
+### Built-in Commands
+
+- `cp` - Copy files
+- `mv` - Move files
+- `rm` - Remove files/directories (use `rm -rf` for recursive)
+- `mkdir` - Make directories (use `mkdir -p` for parents)
+- `pwd` - Print working directory
+- `sleep` - Delay (e.g., `sleep 1`, `sleep 0.5`, `sleep 1m`)
+- `echo` - Display text
+- `cat` - Concatenate and output files
+- `exit` - Exit shell
+- `unset` - Unset environment variables
+- `xargs` - Build arguments from stdin
+
+### Syntax Features
+
+**Boolean lists:**
+```bash
+command1 && command2  # Run command2 if command1 succeeds
+command1 || command2  # Run command2 if command1 fails
+```
+
+**Sequential lists:**
+```bash
+command1 ; command2   # Run both regardless of exit codes
+```
+
+**Environment variables:**
+```bash
+export VAR=value      # Export variable
+echo $VAR             # Use variable
+unset VAR             # Remove variable
+```
+
+**Shell variables:**
+```bash
+VAR=value && echo $VAR  # Not exported to spawned commands
+```
+
+**Pipelines:**
+```bash
+echo Hello | python app.py     # Pipe stdout
+command 2>&1 | python app.py   # Pipe stdout and stderr
+```
+
+**Command substitution:**
+```bash
+python main.py $(git rev-parse HEAD)
+```
+
+**Redirects:**
+```bash
+echo hello > file.txt          # Overwrite
+echo hello >> file.txt         # Append
+python main.py 2> errors.txt   # Redirect stderr
+python main.py &> all.txt      # Redirect both
+```
+
+**Glob expansion:**
+```bash
+echo *.py              # All .py files
+echo **/*.py           # All .py files recursively
+echo data[0-9].csv     # data0.csv through data9.csv
+```
+
+**Negate exit code:**
+```bash
+! command  # Inverts exit code (0→1, 1→0)
+```
+
+## Real-World Example
+
+Here's a complete example from the `cpp-sdl` example project:
+
+```toml
+[workspace]
+name = "sdl_example"
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+
+[dependencies]
+cmake = ">=3.31.6,<4"
+sdl2 = "2.26.5.*"
+
+[feature.build.dependencies]
+cxx-compiler = ">=1.9.0, <2"
+ninja = ">=1.12.1,<2"
+
+[feature.build.tasks.configure]
+cmd = [
+  "cmake",
+  "-GNinja",
+  "-S.",
+  "-B.build",
+]
+inputs = ["CMakeLists.txt"]
+outputs = [".build/CMakeFiles/"]
+
+[feature.build.tasks.build]
+cmd = ["cmake", "--build", ".build"]
+depends-on = ["configure"]
+inputs = ["CMakeLists.txt", "src/*"]
+outputs = [".build/bin/sdl_example"]
+
+[tasks.start]
+cmd = ".build/bin/sdl_example"
+depends-on = ["build"]
+
+[environments]
+build = ["build"]
+```
+
+Run the complete pipeline:
+
+```bash
+pixi run start
+# Automatically runs: configure → build → start
+```

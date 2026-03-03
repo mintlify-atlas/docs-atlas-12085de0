@@ -1,0 +1,288 @@
+---
+title: pixi list
+description: List packages in the workspace
+---
+
+Lists the packages installed in the current workspace environment. Explicit dependencies (packages directly specified in the manifest) are highlighted.
+
+## Usage
+
+```bash
+pixi list [OPTIONS] [REGEX]
+```
+
+**Alias:** `pixi ls`
+
+## Arguments
+
+<ParamField path="REGEX" type="string">
+  List only packages matching a regular expression.
+</ParamField>
+
+## Options
+
+<ParamField path="--manifest-path" type="path">
+  The path to the `pixi.toml` or `pyproject.toml` file.
+</ParamField>
+
+<ParamField path="--environment" type="string" shorthand="e">
+  The environment to list packages for. Defaults to the default environment.
+</ParamField>
+
+<ParamField path="--platform" type="string">
+  The platform to list packages for. Defaults to the current platform.
+</ParamField>
+
+<ParamField path="--json" type="boolean">
+  Output in JSON format.
+  
+  Alias: `--json-pretty`
+</ParamField>
+
+<ParamField path="--sort-by" type="string" default="name">
+  Sorting strategy for packages.
+  
+  Options: `name`, `size`, `kind`
+  
+  Cannot be used with `--json`.
+</ParamField>
+
+<ParamField path="--fields" type="string" default="name,version,build,size,kind,source">
+  Select which fields to display and in what order (comma-separated).
+  
+  Available fields:
+  - `name` - Package name
+  - `version` - Package version
+  - `build` - Build string
+  - `build-number` - Build number
+  - `size` - Package size
+  - `kind` - Package kind (conda/pypi)
+  - `source` - Package source (channel or URL)
+  - `license` - Package license
+  - `license-family` - License family
+  - `is-editable` - Whether package is editable
+  - `platform` - Target platform
+  - `arch` - Architecture
+  - `subdir` - Subdirectory
+  - `url` - Package URL
+  - `file-name` - File name
+  - `md5` - MD5 hash
+  - `sha256` - SHA256 hash
+  - `timestamp` - Package timestamp
+  - `noarch` - Noarch type
+  - `requested-spec` - Requested specification
+  - `depends` - Dependencies
+  - `constrains` - Constraints
+  - `track-features` - Track features
+  
+  Cannot be used with `--json`.
+</ParamField>
+
+<ParamField path="--frozen" type="boolean">
+  Use the lockfile as-is without updating it.
+</ParamField>
+
+<ParamField path="--locked" type="boolean">
+  Check if the lockfile is up-to-date. Errors if the lockfile is out-of-date.
+</ParamField>
+
+<ParamField path="--no-install" type="boolean">
+  Don't install the environment before listing packages.
+</ParamField>
+
+<ParamField path="--explicit" type="boolean" shorthand="x">
+  Only list packages that are explicitly defined in the workspace.
+</ParamField>
+
+## Examples
+
+### List all packages
+
+```bash
+pixi list
+```
+
+Output:
+```
+Package         Version    Build           Size     Kind   Source
+python          3.12.0     h1234567_0      45.2 MB  conda  conda-forge
+numpy           1.26.2     py312h123456_0  7.8 MB   conda  conda-forge
+requests        2.31.0     pyhd8ed1ab_0    102 KB   conda  conda-forge
+```
+
+<Note>
+  Explicit dependencies are shown in **bold** in the terminal output.
+</Note>
+
+### Filter packages by name
+
+```bash
+pixi list python
+```
+
+### List packages matching a regex
+
+```bash
+pixi list "^py.*"
+```
+
+### Sort by size
+
+```bash
+pixi list --sort-by size
+```
+
+### List only explicit dependencies
+
+```bash
+pixi list --explicit
+```
+
+### Output as JSON
+
+```bash
+pixi list --json
+```
+
+### List packages for a specific environment
+
+```bash
+pixi list --environment production
+```
+
+### List packages for a different platform
+
+```bash
+pixi list --platform linux-64
+```
+
+### Custom field selection
+
+```bash
+pixi list --fields name,version,license,size
+```
+
+### List with all available fields
+
+```bash
+pixi list --fields name,version,build,build-number,size,kind,source,license,platform,url
+```
+
+## Package Display
+
+### Color Coding
+
+- **Yellow** version numbers: Conda packages
+- **Blue** version numbers: PyPI packages
+- **Bold** package names: Explicit dependencies
+
+### Package Kinds
+
+- `conda` - Package from a conda channel
+- `pypi` - Package from PyPI
+
+### Editable Packages
+
+Editable packages are marked with `(editable)` in yellow next to their source:
+
+```
+my-package  0.1.0  -  100 KB  pypi  file:///path/to/package (editable)
+```
+
+## JSON Output Format
+
+```json
+[
+  {
+    "name": "python",
+    "version": "3.12.0",
+    "build": "h1234567_0",
+    "size_bytes": 47382912,
+    "kind": "Conda",
+    "source": "https://conda.anaconda.org/conda-forge",
+    "is_explicit": true,
+    "license": "Python-2.0",
+    "md5": "abc123...",
+    "sha256": "def456..."
+  }
+]
+```
+
+## Sorting Options
+
+### By Name (default)
+
+```bash
+pixi list --sort-by name
+```
+
+Packages are sorted alphabetically.
+
+### By Size
+
+```bash
+pixi list --sort-by size
+```
+
+Packages are sorted by file size, smallest to largest.
+
+### By Kind
+
+```bash
+pixi list --sort-by kind
+```
+
+Packages are grouped by type (conda/pypi).
+
+## Use Cases
+
+### Audit Dependencies
+
+```bash
+# Check what's installed
+pixi list --explicit
+
+# Find large packages
+pixi list --sort-by size
+```
+
+### Export Package List
+
+```bash
+# Export to JSON
+pixi list --json > packages.json
+
+# Export explicit dependencies only
+pixi list --explicit --json > dependencies.json
+```
+
+### Cross-Platform Development
+
+```bash
+# Check what would be installed on Linux
+pixi list --platform linux-64
+
+# Check what would be installed on macOS ARM
+pixi list --platform osx-arm64
+```
+
+### License Compliance
+
+```bash
+# List all licenses
+pixi list --fields name,version,license,license-family
+```
+
+<Tip>
+  You can use `pixi ls` as a shorthand for `pixi list`.
+</Tip>
+
+## Differences from `pixi tree`
+
+| Feature | `pixi list` | `pixi tree` |
+|---------|-------------|-------------|
+| Output | Flat package list | Dependency tree |
+| Shows relationships | No | Yes |
+| Sorting | Yes | No |
+| JSON output | Yes | No |
+| Field selection | Yes | No |

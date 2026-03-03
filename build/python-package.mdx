@@ -1,0 +1,365 @@
+---
+title: Building Python Packages
+description: Create conda packages from Python projects using pixi-build-python
+---
+
+Learn how to build Python packages with Pixi, leveraging the conda ecosystem's cross-language capabilities.
+
+<Warning>
+`pixi-build` is a preview feature and will change until stabilized. Keep this in mind for production projects.
+</Warning>
+
+## Why Build Python Packages with Pixi?
+
+Building Python packages with Pixi offers unique advantages:
+
+1. **Cross-language support** - Manage Python packages alongside Rust, C++, R, and other languages
+2. **Unified tooling** - Build both conda and Python packages with the same tool
+3. **Conda ecosystem** - Access packages from conda-forge, not just PyPI
+4. **Workspace support** - Develop multiple interdependent packages together
+
+## Creating Your First Python Package
+
+<Steps>
+
+### Set Up the Project Structure
+
+Create a Python package with standard layout:
+
+```bash
+mkdir -p python_rich/src/python_rich
+cd python_rich
+```
+
+```text
+python_rich/
+├── src/
+│   └── python_rich/
+│       └── __init__.py
+└── pyproject.toml
+```
+
+<Note>
+This project uses a src-layout, but Pixi supports both [flat- and src-layouts](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/).
+</Note>
+
+### Create the Python Code
+
+Add functionality to your package:
+
+```python title="src/python_rich/__init__.py"
+from dataclasses import dataclass, fields
+from rich.console import Console
+from rich.table import Table
+
+
+@dataclass
+class Person:
+    name: str
+    age: int
+    city: str
+
+
+def main() -> None:
+    console = Console()
+
+    people = [
+        Person("John Doe", 30, "New York"),
+        Person("Jane Smith", 25, "Los Angeles"),
+        Person("Tim de Jager", 35, "Utrecht"),
+    ]
+
+    table = Table()
+
+    for column in fields(Person):
+        table.add_column(column.name)
+
+    for person in people:
+        table.add_row(person.name, str(person.age), person.city)
+
+    console.print(table)
+```
+
+### Configure Python Metadata
+
+Create the `pyproject.toml` for Python-specific configuration:
+
+```toml title="pyproject.toml"
+[project]
+name = "python_rich"
+version = "0.1.0"
+requires-python = ">= 3.11"
+dependencies = ["rich"]  # (1)!
+
+[project.scripts]
+rich-example-main = "python_rich:main"  # (2)!
+
+[build-system]  # (3)!
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+```
+
+1. Dependencies for PyPI distribution
+2. Creates an executable that calls the `main` function
+3. Choose a PEP 517 build backend - `hatchling` works well with minimal config
+
+### Initialize Pixi
+
+Create the Pixi manifest:
+
+```bash
+pixi init --format pixi
+```
+
+This generates a `pixi.toml` file. You can also integrate everything into `pyproject.toml` by prepending `tool.pixi.` to each table.
+
+### Configure the Pixi Manifest
+
+Edit `pixi.toml` to configure building:
+
+```toml title="pixi.toml"
+[workspace]  # (1)!
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+preview = ["pixi-build"]
+
+[dependencies]  # (2)!
+python_rich = { path = "." }
+
+[tasks]  # (3)!
+start = "rich-example-main"
+
+[package]  # (4)!
+name = "python_rich"
+version = "0.1.0"
+
+[package.build]  # (5)!
+backend = { name = "pixi-build-python", version = "0.4.*" }
+
+[package.host-dependencies]  # (6)!
+hatchling = "==1.26.3"
+
+[package.run-dependencies]  # (7)!
+rich = "13.9.*"
+```
+
+1. Workspace-level configuration shared across all packages
+2. Add your package as a dependency to include it in environments
+3. Define tasks using the executable from `pyproject.toml`
+4. Package metadata used when others depend on it or for uploads
+5. The `pixi-build-python` backend converts Python packages to conda packages
+6. Build-time Python dependencies from conda (not PyPI)
+7. Runtime dependencies from conda channels
+
+### Build and Run
+
+Build and test your package:
+
+```bash
+pixi run start
+```
+
+</Steps>
+
+You should see:
+
+```text
+┏━━━━━━━━━━━━━━┳━━━━━┳━━━━━━━━━━━━━┓
+┃ name         ┃ age ┃ city        ┃
+┡━━━━━━━━━━━━━━╇━━━━━╇━━━━━━━━━━━━━┩
+│ John Doe     │ 30  │ New York    │
+│ Jane Smith   │ 25  │ Los Angeles │
+│ Tim de Jager │ 35  │ Utrecht     │
+└──────────────┴─────┴─────────────┘
+```
+
+## Advanced Configuration
+
+### Using Custom Backend Channels
+
+For the latest backend features:
+
+```toml
+[package.build.backend]
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+name = "pixi-build-python"
+version = "0.4.*"
+```
+
+### Noarch Packages
+
+For pure Python packages without compiled extensions:
+
+```toml
+[package.build.config]
+noarch = true
+```
+
+This creates a single package that works across all platforms.
+
+### Custom Build Configuration
+
+<CodeGroup>
+
+```toml Editable Installs
+[package.build.config]
+editable = true
+```
+
+```toml Skip Install Phase
+[package.build.config]
+skip-install = true
+```
+
+```toml Custom Python Version
+[package.host-dependencies]
+python = "3.11.*"
+```
+
+</CodeGroup>
+
+## Real-World Example
+
+Here's a complete example from the `array-api-extra` package:
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+name = "array-api-extra-build"
+platforms = ["osx-arm64", "linux-64", "osx-64", "win-64"]
+preview = ["pixi-build"]
+version = "0.1.0"
+
+[dependencies]
+array-api-extra = { path = "." }
+
+[tasks]
+test = "python -c 'import array_api_extra'"
+
+[package]
+name = "array-api-extra"
+version = "0.8.0"
+
+[package.build.backend]
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+name = "pixi-build-python"
+version = "0.4.*"
+```
+
+## Understanding Host vs Run Dependencies
+
+<Accordion title="Why specify dependencies twice?">
+Python packages need to declare dependencies in two places:
+
+**In `pyproject.toml`** (for PyPI):
+```toml
+[project]
+dependencies = ["rich"]
+```
+
+**In `pixi.toml`** (for conda):
+```toml
+[package.run-dependencies]
+rich = "13.9.*"
+```
+
+This allows the same package to work in both ecosystems.
+</Accordion>
+
+<Accordion title="What are host-dependencies?">
+Host dependencies are needed during the build process. For Python:
+
+```toml
+[package.host-dependencies]
+hatchling = "*"  # Build backend
+uv = "*"          # Optional: faster installer
+python = "3.11.*" # Python version for building
+```
+
+These come from conda channels, ensuring consistent build environments.
+
+See [dependency types](./dependency-types) for details.
+</Accordion>
+
+## Integration with pyproject.toml
+
+You can integrate Pixi configuration into `pyproject.toml`:
+
+```toml title="pyproject.toml"
+[project]
+name = "python_rich"
+version = "0.1.0"
+requires-python = ">= 3.11"
+dependencies = ["rich"]
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.pixi.workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+preview = ["pixi-build"]
+
+[tool.pixi.dependencies]
+python_rich = { path = "." }
+
+[tool.pixi.package]
+name = "python_rich"
+version = "0.1.0"
+
+[tool.pixi.package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Workspaces" icon="folder-tree" href="./workspace">
+Combine multiple packages in one workspace
+</Card>
+
+<Card title="Dependency Types" icon="link" href="./dependency-types">
+Understand build, host, and run dependencies
+</Card>
+
+<Card title="C++ Integration" icon="cpp" href="./cpp-package">
+Mix Python with C++ packages
+</Card>
+
+<Card title="Build Variants" icon="code-branch" href="./variants">
+Build against multiple Python versions
+</Card>
+
+</CardGroup>
+
+## Common Issues
+
+<Warning>
+**Technical Limitation**: Dependencies like `hatchling`, `pip`, and `uv` must be in `host-dependencies` (not `build-dependencies`) due to how the build process currently works. This ensures the correct Python prefix is used.
+</Warning>
+
+<Accordion title="Package not found after build">
+Ensure your package is added to workspace dependencies:
+
+```toml
+[dependencies]
+your_package = { path = "." }
+```
+</Accordion>
+
+<Accordion title="Import errors at runtime">
+Add missing dependencies to `run-dependencies`:
+
+```toml
+[package.run-dependencies]
+missing_package = "*"
+```
+</Accordion>

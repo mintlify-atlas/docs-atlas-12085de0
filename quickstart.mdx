@@ -1,80 +1,456 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Create your first Pixi workspace and run your first task
 ---
 
-## Get started in three steps
+# Quick Start Guide
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This guide will walk you through creating your first Pixi workspace, adding dependencies, and running tasks. You'll have a working project in under 5 minutes!
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+Make sure you have [installed Pixi](/installation) before continuing.
 </Note>
+
+## Create Your First Workspace
+
+A Pixi workspace is a directory with a `pixi.toml` manifest file that defines your project's dependencies, tasks, and environments.
+
+<Steps>
+  <Step title="Initialize a new workspace">
+    Create a new workspace called `my_workspace`:
+
+    ```bash
+    pixi init my_workspace
+    cd my_workspace
+    ```
+
+    This creates a new directory with the following structure:
+
+    ```
+    my_workspace/
+    ├── .gitattributes
+    ├── .gitignore
+    └── pixi.toml
+    ```
+  </Step>
+
+  <Step title="Explore the manifest">
+    The `pixi.toml` file is your workspace's manifest:
+
+    ```toml
+    [workspace]
+    authors = ["Your Name <your.email@example.com>"]
+    channels = ["conda-forge"]
+    name = "my_workspace"
+    platforms = ["linux-64"]  # Your current platform
+    version = "0.1.0"
+
+    [tasks]
+
+    [dependencies]
+    ```
+
+    <Tip>
+    Install the [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml) extension in VS Code for autocompletion based on Pixi's JSON schema!
+    </Tip>
+  </Step>
+</Steps>
+
+## Add Dependencies
+
+Let's add some Python packages to the workspace.
+
+<Steps>
+  <Step title="Add Python and NumPy">
+    ```bash
+    pixi add python numpy
+    ```
+
+    This command:
+    - Adds dependencies to `pixi.toml`
+    - Solves all dependencies
+    - Creates/updates `pixi.lock` with exact versions
+    - Installs packages into the environment at `.pixi/envs/default`
+
+    Your `pixi.toml` now includes:
+
+    ```toml
+    [dependencies]
+    python = ">=3.13.1,<3.14"
+    numpy = ">=2.2.6,<3"
+    ```
+  </Step>
+
+  <Step title="Add more packages">
+    Add pytest for testing:
+
+    ```bash
+    pixi add pytest
+    ```
+
+    You can also specify exact versions:
+
+    ```bash
+    pixi add pandas==2.2.0
+    ```
+  </Step>
+</Steps>
+
+### Understanding the Lock File
+
+Pixi automatically created a `pixi.lock` file containing exact versions of all dependencies:
+
+```yaml
+version: 6
+environments:
+  default:
+    channels:
+    - url: https://prefix.dev/conda-forge/
+    packages:
+      linux-64:
+      - conda: https://prefix.dev/conda-forge/linux-64/python-3.13.1-...
+      - conda: https://prefix.dev/conda-forge/linux-64/numpy-2.2.6-...
+```
+
+This ensures reproducible environments across machines and over time.
+
+## Run Commands in Your Environment
+
+Now let's use the packages we installed.
+
+<Steps>
+  <Step title="Run a command directly">
+    Use `pixi run` to execute commands in the environment:
+
+    ```bash
+    pixi run python --version
+    ```
+
+    ```bash
+    Python 3.13.1 | packaged by conda-forge
+    ```
+
+    Try using NumPy:
+
+    ```bash
+    pixi run python -c "import numpy; print(numpy.__version__)"
+    ```
+
+    ```bash
+    2.2.6
+    ```
+  </Step>
+
+  <Step title="Use the shell">
+    Start an interactive shell in the environment:
+
+    ```bash
+    pixi shell
+    ```
+
+    Your prompt will change to indicate you're in the Pixi environment. Now you can run commands directly:
+
+    ```bash
+    python --version
+    python -c "import numpy; print('NumPy works!')"
+    exit
+    ```
+
+    Type `exit` to leave the shell.
+  </Step>
+</Steps>
+
+## Create and Run Tasks
+
+Tasks are reusable commands defined in your manifest. They're perfect for common operations like testing, building, or running your application.
+
+<Steps>
+  <Step title="Create a Python script">
+    Create a file called `hello.py`:
+
+    ```python
+    # hello.py
+    import numpy as np
+
+    def main():
+        arr = np.array([1, 2, 3, 4, 5])
+        print(f"Array: {arr}")
+        print(f"Mean: {arr.mean()}")
+        print(f"Sum: {arr.sum()}")
+
+    if __name__ == "__main__":
+        main()
+    ```
+  </Step>
+
+  <Step title="Add a task to run the script">
+    ```bash
+    pixi task add start "python hello.py"
+    ```
+
+    This adds the following to your `pixi.toml`:
+
+    ```toml
+    [tasks]
+    start = "python hello.py"
+    ```
+  </Step>
+
+  <Step title="Run the task">
+    ```bash
+    pixi run start
+    ```
+
+    Output:
+
+    ```bash
+    ✨ Pixi task (start): python hello.py
+    Array: [1 2 3 4 5]
+    Mean: 3.0
+    Sum: 15
+    ```
+  </Step>
+</Steps>
+
+## Add More Complex Tasks
+
+Tasks can have dependencies and arguments for more complex workflows.
+
+<Steps>
+  <Step title="Add a test task">
+    Create a simple test file `test_hello.py`:
+
+    ```python
+    # test_hello.py
+    import numpy as np
+
+    def test_numpy_array():
+        arr = np.array([1, 2, 3])
+        assert arr.sum() == 6
+        assert arr.mean() == 2.0
+    ```
+
+    Add a test task:
+
+    ```bash
+    pixi task add test "pytest -v"
+    ```
+  </Step>
+
+  <Step title="Create a task with dependencies">
+    Add this to your `pixi.toml` manually:
+
+    ```toml
+    [tasks]
+    start = "python hello.py"
+    test = "pytest -v"
+
+    [tasks.hello]
+    cmd = "echo Hello from Pixi!"
+
+    [tasks.run-all]
+    depends-on = ["hello", "start", "test"]
+    ```
+
+    Now running `pixi run run-all` will execute all three tasks in order:
+
+    ```bash
+    pixi run run-all
+    ```
+
+    ```bash
+    ✨ Pixi task (hello): echo Hello from Pixi!
+    Hello from Pixi!
+    ✨ Pixi task (start): python hello.py
+    Array: [1 2 3 4 5]
+    Mean: 3.0
+    Sum: 15
+    ✨ Pixi task (test): pytest -v
+    ===== test session starts =====
+    collected 1 item
+
+    test_hello.py::test_numpy_array PASSED
+    ```
+  </Step>
+</Steps>
+
+## Working with PyPI Packages
+
+Pixi seamlessly integrates conda packages with PyPI packages.
+
+<Steps>
+  <Step title="Add a PyPI package">
+    Use the `--pypi` flag to install from PyPI:
+
+    ```bash
+    pixi add --pypi httpx
+    ```
+
+    This adds to `pixi.toml`:
+
+    ```toml
+    [pypi-dependencies]
+    httpx = ">=0.28.1,<0.29"
+    ```
+  </Step>
+
+  <Step title="Use the PyPI package">
+    ```bash
+    pixi run python -c "import httpx; print(httpx.__version__)"
+    ```
+
+    Pixi ensures there are no conflicts between conda and PyPI packages.
+  </Step>
+</Steps>
+
+## Complete Example Workflow
+
+Here's a complete example putting it all together:
+
+<CodeGroup>
+```toml pixi.toml
+[workspace]
+name = "data-analysis"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+version = "0.1.0"
+
+[dependencies]
+python = ">=3.11"
+numpy = ">=1.24"
+pandas = ">=2.0"
+matplotlib = ">=3.7"
+pytest = ">=7.4"
+
+[pypi-dependencies]
+seaborn = ">=0.12"
+
+[tasks]
+analyze = "python analyze.py"
+test = "pytest tests/"
+visualize = "python plot.py"
+
+[tasks.full-pipeline]
+depends-on = ["analyze", "test", "visualize"]
+```
+
+```python analyze.py
+import pandas as pd
+import numpy as np
+
+def main():
+    # Create sample data
+    data = pd.DataFrame({
+        'x': np.random.randn(100),
+        'y': np.random.randn(100)
+    })
+    
+    # Save results
+    data.to_csv('data.csv', index=False)
+    print(f"Generated {len(data)} data points")
+    print(f"Mean X: {data['x'].mean():.3f}")
+    print(f"Mean Y: {data['y'].mean():.3f}")
+
+if __name__ == "__main__":
+    main()
+```
+
+```python plot.py
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def main():
+    data = pd.read_csv('data.csv')
+    
+    plt.figure(figsize=(10, 6))
+    sns.scatterplot(data=data, x='x', y='y')
+    plt.title('Data Distribution')
+    plt.savefig('plot.png')
+    print("Plot saved to plot.png")
+
+if __name__ == "__main__":
+    main()
+```
+</CodeGroup>
+
+Run the complete pipeline:
+
+```bash
+pixi run full-pipeline
+```
+
+## Next Steps
+
+Congratulations! You've learned the basics of Pixi. Here's what to explore next:
+
+<CardGroup cols={2}>
+  <Card title="Multiple Environments" icon="layer-group" href="/workspace/multi-environment">
+    Learn how to manage development, testing, and production environments
+  </Card>
+  
+  <Card title="Advanced Tasks" icon="gears" href="/workspace/advanced-tasks">
+    Discover powerful task features like arguments and templates
+  </Card>
+  
+  <Card title="Global Tools" icon="globe" href="/global-tools/introduction">
+    Install CLI tools system-wide with Pixi
+  </Card>
+  
+  <Card title="Multi-Platform Support" icon="server" href="/workspace/multi-platform-configuration">
+    Configure projects for Linux, macOS, and Windows
+  </Card>
+</CardGroup>
+
+## Common Workflows
+
+### Starting an Existing Project
+
+If you clone a repository with a `pixi.toml`:
+
+```bash
+git clone <repository>
+cd <repository>
+pixi install  # Creates environment from pixi.lock
+pixi run start
+```
+
+### Adding Platform-Specific Dependencies
+
+```bash
+pixi add --platform linux-64 pkg-config
+pixi add --platform win-64 win-specific-package
+```
+
+### Updating Dependencies
+
+```bash
+pixi update           # Update all dependencies
+pixi update numpy     # Update specific package
+pixi upgrade numpy    # Upgrade to latest, even if pinned
+```
+
+### Cleaning Up
+
+```bash
+pixi clean            # Remove the environment
+pixi clean cache      # Clean download cache
+```
+
+## Tips for Success
+
+<Tip>
+**Commit `pixi.lock`**: Always commit your lock file to version control to ensure reproducible environments.
+</Tip>
+
+<Tip>
+**Use `pixi.toml` schema**: Configure your IDE to use the JSON schema for autocompletion and validation.
+</Tip>
+
+<Tip>
+**Global tools**: Use `pixi global install` for CLI tools you want available everywhere, not just in projects.
+</Tip>
+
+<Warning>
+**Don't mix conda and pip**: Always use `pixi add --pypi` for PyPI packages instead of running `pip install` directly. This ensures Pixi can manage dependencies properly.
+</Warning>

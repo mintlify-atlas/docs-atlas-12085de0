@@ -1,0 +1,185 @@
+---
+title: pixi auth
+---
+
+Manage authentication credentials for package channels.
+
+## Usage
+
+```bash
+pixi auth <COMMAND>
+```
+
+## Description
+
+The `pixi auth` command manages authentication credentials for conda and PyPI package channels. It stores credentials securely and uses them automatically when accessing private channels or uploading packages.
+
+<Note>
+  The `pixi auth` command uses the [rattler](https://github.com/prefix-dev/rattler) authentication system. All subcommands and options are provided by rattler.
+</Note>
+
+## Subcommands
+
+### `pixi auth login`
+
+Authenticate with a package channel.
+
+```bash
+pixi auth login [OPTIONS] <HOST>
+```
+
+**Arguments:**
+- `<HOST>` - The host to authenticate with (e.g., `https://prefix.dev`, `conda.anaconda.org`)
+
+**Options:**
+- `--token <TOKEN>` - Provide the authentication token directly
+- `--username <USERNAME>` - Username for basic authentication
+- `--password <PASSWORD>` - Password for basic authentication  
+- `--conda-token <TOKEN>` - Conda token for Anaconda.org style authentication
+
+### `pixi auth logout`
+
+Remove stored credentials for a host.
+
+```bash
+pixi auth logout <HOST>
+```
+
+## Examples
+
+### Login to Prefix.dev
+
+Authenticate with Prefix.dev using an interactive prompt:
+
+```bash
+pixi auth login https://prefix.dev
+```
+
+You'll be prompted for your authentication token.
+
+### Login with token
+
+Provide the token directly:
+
+```bash
+pixi auth login https://prefix.dev --token YOUR_TOKEN_HERE
+```
+
+### Login with username/password
+
+Use basic authentication:
+
+```bash
+pixi auth login https://my-private-channel.com --username myuser --password mypass
+```
+
+### Login to Anaconda.org
+
+Authenticate with Anaconda.org:
+
+```bash
+pixi auth login conda.anaconda.org --conda-token YOUR_ANACONDA_TOKEN
+```
+
+### Logout
+
+Remove stored credentials:
+
+```bash
+pixi auth logout https://prefix.dev
+```
+
+## Authentication Storage
+
+Credentials are stored securely in:
+
+- **Linux**: `~/.rattler/credentials.json`
+- **macOS**: `~/.rattler/credentials.json`
+- **Windows**: `%USERPROFILE%\.rattler\credentials.json`
+
+You can override this location using:
+- The `RATTLER_AUTH_FILE` environment variable
+- The `authentication-override-file` configuration option
+
+## Supported Hosts
+
+<Accordion title="Prefix.dev">
+  ```bash
+  pixi auth login https://prefix.dev
+  ```
+  
+  Get your token from: https://prefix.dev/settings/tokens
+</Accordion>
+
+<Accordion title="Anaconda.org">
+  ```bash
+  pixi auth login conda.anaconda.org --conda-token TOKEN
+  ```
+  
+  Get your token from: https://anaconda.org/settings/tokens
+</Accordion>
+
+<Accordion title="Quetz">
+  ```bash
+  pixi auth login https://my-quetz-instance.com
+  ```
+  
+  Supports token-based authentication.
+</Accordion>
+
+<Accordion title="Private channels">
+  ```bash
+  pixi auth login https://my-company.com/conda
+  ```
+  
+  Works with any conda-compatible channel that requires authentication.
+</Accordion>
+
+## Usage with Commands
+
+Once authenticated, credentials are automatically used:
+
+```bash
+# Add package from private channel
+pixi auth login https://prefix.dev/my-private-channel
+pixi add my-private-package
+
+# Upload packages
+pixi auth login https://prefix.dev
+pixi upload --url https://prefix.dev/my-channel my-package.conda
+```
+
+## Environment Variables
+
+<ParamField path="RATTLER_AUTH_FILE" type="path">
+  Override the default credentials file location.
+  
+  ```bash
+  export RATTLER_AUTH_FILE=/custom/path/credentials.json
+  pixi auth login https://prefix.dev
+  ```
+</ParamField>
+
+## Security Best Practices
+
+<Warning>
+  Never commit credentials or tokens to version control. Use environment variables or secure secret management for CI/CD.
+</Warning>
+
+<Tip>
+  For CI/CD pipelines, use environment variables or secrets management:
+  
+  ```bash
+  # In CI/CD
+  echo "$AUTH_TOKEN" | pixi auth login https://prefix.dev --token -
+  ```
+</Tip>
+
+## Related Commands
+
+- [`pixi upload`](/commands/upload) - Upload packages using stored credentials
+- [`pixi config`](/commands/config) - Configure authentication file location
+
+## Related Configuration
+
+- [`authentication-override-file`](/reference/configuration#authentication-override-file) - Override credentials file location

@@ -1,0 +1,400 @@
+---
+title: System Requirements
+description: Defining system requirements and constraints for reproducible environments
+---
+
+System requirements tell Pixi what system specifications your environment needs to install and run correctly. They ensure dependencies match the operating system and hardware of your machine.
+
+## What Are System Requirements?
+
+System requirements define the "kind of machine" your environment can run on:
+
+```toml
+[system-requirements]
+linux = "4.18"
+libc = { family = "glibc", version = "2.28" }
+cuda = "12"
+macos = "13.0"
+```
+
+This creates an environment that can run on:
+- Linux with kernel version 4.18
+- GNU C Library (glibc) version 2.28
+- CUDA version 12
+- macOS version 13.0
+
+<Info>
+System requirements combine with your platform definitions to ensure environment consistency and machine compatibility.
+</Info>
+
+## How System Requirements Work
+
+When resolving dependencies, Pixi combines:
+
+1. **Default requirements** for your platforms
+2. **Custom requirements** from your `[system-requirements]` table
+
+System requirements are implemented as [virtual packages](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-virtual.html) - special packages like `__linux`, `__cuda`, `__glibc` that declare system features without containing files. The solver uses them to filter incompatible packages.
+
+<Note>
+The root-level `[system-requirements]` applies to the default feature, affecting all environments that include it (unless `no-default-feature = true`).
+</Note>
+
+## Version Semantics
+
+System requirements specify the version **available on your system**, not a maximum or minimum:
+
+```toml
+[system-requirements]
+cuda = "12.1"
+```
+
+The dependency resolver determines compatibility:
+
+- Package requires `__cuda >= 12` → System with `12.1`, `12.6`, or higher matches ✅
+- Package requires `__cuda <= 12` → System with `12.0`, `11`, or lower matches ✅
+
+<Tip>
+Most packages specify minimum versions (`>=`), so system requirements often define the minimum system specifications.
+</Tip>
+
+Example from [`cuda-version-12.9`](https://conda-metadata-app.streamlit.app/?q=conda-forge%2Fnoarch%2Fcuda-version-12.9-h4f385c5_3.conda):
+
+```
+cudatoolkit 12.9|12.9.*
+__cuda >=12
+```
+
+## Default System Requirements
+
+Pixi provides sensible defaults per platform:
+
+<Tabs>
+  <Tab title="Linux">
+    ```toml
+    [system-requirements]
+    linux = "4.18"
+    libc = { family = "glibc", version = "2.28" }
+    ```
+  </Tab>
+  <Tab title="Windows">
+    Windows currently has no default system requirements.
+    Define them if your workspace needs specific Windows configurations.
+  </Tab>
+  <Tab title="macOS Intel">
+    ```toml
+    [system-requirements]
+    macos = "13.0"
+    ```
+  </Tab>
+  <Tab title="macOS ARM">
+    ```toml
+    [system-requirements]
+    macos = "13.0"
+    ```
+  </Tab>
+</Tabs>
+
+## Customizing System Requirements
+
+### Adjusting for Older Systems
+
+If you see an error like:
+
+```bash
+× The current system has a mismatching virtual package.
+  The workspace requires '__linux' to be at least version '4.18'
+  but the system has version '4.12.14'
+```
+
+Lower the requirements to match your system:
+
+```toml
+[system-requirements]
+linux = "4.12.14"
+libc = { family = "glibc", version = "2.17" }
+```
+
+<Warning>
+Lowering system requirements may allow installation of packages that don't work correctly on older systems. Test thoroughly.
+</Warning>
+
+### CUDA Configuration
+
+To use CUDA, specify the version in system requirements:
+
+```toml
+[system-requirements]
+cuda = "12.1"
+```
+
+This ensures:
+- CUDA is recognized during dependency resolution
+- Packages requiring `__cuda >= 12.1` can be installed
+- The version is locked into the lock file
+
+<Accordion title="Does system-requirements enforce CUDA runtime version?">
+**No.** The `cuda` field specifies the CUDA version supported by your NVIDIA driver API, not the runtime version.
+
+It ensures packages with CUDA dependencies resolve correctly based on your driver's capabilities.
+</Accordion>
+
+### Environment-Specific Requirements
+
+Set different system requirements per feature/environment:
+
+```toml
+[workspace]
+platforms = ["linux-64", "osx-arm64"]
+
+# CUDA environment for Linux
+[feature.cuda]
+platforms = ["linux-64"]
+
+[feature.cuda.system-requirements]
+cuda = "12.1"
+
+# MLX environment for macOS ARM
+[feature.mlx]
+platforms = ["osx-arm64"]
+
+[feature.mlx.system-requirements]
+macos = "13.5"  # MLX requires macOS 13.5+
+
+[environments]
+cuda = ["cuda"]
+mlx = ["mlx"]
+```
+
+<Tip>
+Use environment-specific system requirements when supporting multiple hardware configurations in one workspace.
+</Tip>
+
+## Available System Requirements
+
+### Linux
+
+```toml
+[system-requirements]
+linux = "4.18"  # Kernel version
+libc = { family = "glibc", version = "2.28" }  # C library
+```
+
+**Common values:**
+- `linux`: `"4.18"`, `"5.4"`, `"5.15"`
+- `libc.family`: `"glibc"`, `"musl"`
+- `libc.version`: `"2.17"`, `"2.28"`, `"2.31"`
+
+### macOS
+
+```toml
+[system-requirements]
+macos = "13.0"  # macOS version
+```
+
+**Common values:**
+- `"11.0"` - Big Sur
+- `"12.0"` - Monterey
+- `"13.0"` - Ventura
+- `"14.0"` - Sonoma
+
+### CUDA
+
+```toml
+[system-requirements]
+cuda = "12.1"  # CUDA version
+```
+
+**Common values:**
+- `"11.8"`, `"12.0"`, `"12.1"`, `"12.2"`
+
+### Architecture
+
+```toml
+[system-requirements]
+archspec = "x86_64"  # CPU architecture
+```
+
+**Common values:**
+- `"x86_64"` - Intel/AMD 64-bit
+- `"aarch64"` - ARM 64-bit
+
+## Overriding System Requirements
+
+Override detected system requirements using environment variables:
+
+**CUDA Version**
+```bash
+CONDA_OVERRIDE_CUDA=11.8 pixi install
+```
+
+**glibc Version**
+```bash
+CONDA_OVERRIDE_GLIBC=2.17 pixi install
+```
+
+**macOS Version**
+```bash
+CONDA_OVERRIDE_OSX=12.0 pixi install
+```
+
+<Warning>
+Overrides can allow installing packages that won't run on your system. Use carefully and test thoroughly.
+</Warning>
+
+## Real-World Examples
+
+### CUDA Machine Learning Project
+
+```toml
+[workspace]
+name = "ml-cuda-project"
+channels = ["conda-forge", "pytorch", "nvidia"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = "3.11.*"
+pytorch = { version = "2.0.*", channel = "pytorch" }
+
+[system-requirements]
+linux = "5.4"
+libc = { family = "glibc", version = "2.31" }
+cuda = "12.1"
+
+[dependencies]
+cudatoolkit = "12.1"
+cudnn = "8.*"
+pytorch-cuda = { version = "12.1.*", channel = "pytorch" }
+```
+
+### Multi-Environment with Different Requirements
+
+```toml
+[workspace]
+name = "multi-hw-project"
+channels = ["conda-forge", "pytorch"]
+platforms = ["linux-64", "osx-arm64"]
+
+[dependencies]
+python = "3.11.*"
+pytorch = ">=2.0"
+
+# CPU-only feature (default)
+[feature.cpu]
+# No special system requirements
+
+# CUDA feature for Linux
+[feature.cuda]
+platforms = ["linux-64"]
+
+[feature.cuda.system-requirements]
+linux = "5.4"
+cuda = "12.1"
+
+[feature.cuda.dependencies]
+pytorch-cuda = { version = "12.1.*", channel = "pytorch" }
+
+# MLX feature for Apple Silicon
+[feature.mlx]
+platforms = ["osx-arm64"]
+
+[feature.mlx.system-requirements]
+macos = "13.5"  # MLX minimum requirement
+
+[feature.mlx.dependencies]
+mlx = ">=0.16.0"
+
+[environments]
+default = ["cpu"]
+cuda = ["cuda"]
+mlx = ["mlx"]
+```
+
+### Legacy System Support
+
+```toml
+[workspace]
+name = "legacy-support"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+# Support older CentOS 7 systems
+[system-requirements]
+linux = "3.10"  # CentOS 7 kernel
+libc = { family = "glibc", version = "2.17" }  # CentOS 7 glibc
+
+[dependencies]
+python = "3.8.*"  # Older Python for compatibility
+```
+
+## Best Practices
+
+**Document System Requirements**
+```toml
+# pixi.toml
+[system-requirements]
+# Minimum: Ubuntu 20.04, RHEL 8, Debian 11
+linux = "4.18"
+libc = { family = "glibc", version = "2.28" }
+
+# Requires CUDA-capable GPU with driver >= 530
+cuda = "12.1"
+```
+
+**Test on Minimum Requirements**
+```yaml
+# .github/workflows/test.yml
+jobs:
+  test-minimum:
+    runs-on: ubuntu-20.04  # Tests minimum Linux version
+    steps:
+      - run: pixi install --frozen
+      - run: pixi run test
+```
+
+**Use Environment Variables in CI**
+```yaml
+# For systems without CUDA hardware
+env:
+  CONDA_OVERRIDE_CUDA: "12.1"
+steps:
+  - run: pixi install --frozen
+```
+
+**Set Per-Environment Requirements**
+```toml
+# Different hardware needs different requirements
+[feature.cuda.system-requirements]
+cuda = "12.1"
+
+[feature.rocm.system-requirements]
+rocm = "5.7"
+```
+
+## Troubleshooting
+
+**Error: Mismatching virtual package**
+```bash
+× The workspace requires '__cuda' to be at least version '12'
+  but the system has version '11.8'
+```
+
+**Solution:** Update CUDA drivers or lower requirements:
+```toml
+[system-requirements]
+cuda = "11.8"
+```
+
+**Error: Package has no builds for system**
+```bash
+× No package builds found for 'pytorch-cuda==12.1'
+  with system requirements: __cuda==11.8
+```
+
+**Solution:** Install compatible package version or update system requirements.
+
+## Further Reading
+
+- [Conda Virtual Packages Documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-virtual.html)
+- [Multi-Environment Configuration](./multi-environment.mdx)
+- [Multi-Platform Configuration](./multi-platform.mdx)

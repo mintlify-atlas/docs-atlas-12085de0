@@ -1,0 +1,67 @@
+---
+title: pixi global upgrade
+description: Upgrade globally installed packages
+---
+
+<Note>
+  This command has been removed and replaced with `pixi global update`.
+</Note>
+
+## Migration
+
+The `pixi global upgrade` command has been removed in favor of `pixi global update`, which provides more flexibility and better semantics.
+
+### Old Command
+
+```bash
+pixi global upgrade package-name
+```
+
+### New Command
+
+```bash
+pixi global update package-name
+```
+
+## Why the Change?
+
+The command was renamed to align with pixi's terminology:
+- **update**: Update packages within the current version constraints
+- **upgrade**: Change version constraints (e.g., `python=3.11` to `python=3.12`)
+
+For most use cases, you want to **update** packages, not upgrade their version specifications.
+
+## Using `pixi global update`
+
+### Update a specific package
+
+```bash
+pixi global update package-name
+```
+
+### Update all packages
+
+```bash
+pixi global update --all
+```
+
+### Update packages in a specific environment
+
+```bash
+pixi global update --environment myenv
+```
+
+For more information, see:
+- [pixi global update documentation](./global-update)
+
+## Error Message
+
+If you try to run `pixi global upgrade`, you'll see:
+
+```
+Error: `pixi global upgrade` has been removed
+
+Help: Use `pixi global update` for most use cases
+
+Note: This command will be re-added in future releases with updated semantics
+```

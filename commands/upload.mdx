@@ -1,0 +1,113 @@
+---
+title: pixi upload
+---
+
+Upload conda packages to various channels.
+
+## Usage
+
+```bash
+pixi upload [OPTIONS] <PACKAGE_FILE>...
+```
+
+## Description
+
+The `pixi upload` command uploads conda packages to various channel types. It supports multiple server types and uses the pixi authentication system for credentials.
+
+Supported server types:
+- **prefix** - Prefix.dev channels
+- **anaconda** - Anaconda.org channels  
+- **quetz** - Quetz server
+- **artifactory** - JFrog Artifactory
+- **s3** - Amazon S3 buckets
+- **conda-forge** - Conda-forge staging
+
+## Authentication
+
+The upload command uses `pixi auth login` for authentication. Make sure to authenticate before uploading:
+
+```bash
+pixi auth login <SERVER_URL>
+pixi upload my-package-0.1.0-*.conda
+```
+
+## Options
+
+The upload command supports all options from `rattler-build upload`. Common options include:
+
+<ParamField path="package-files" type="path" required>
+  One or more package files to upload.
+  
+  ```bash
+  pixi upload package-0.1.0-linux-64.conda
+  pixi upload *.conda
+  ```
+</ParamField>
+
+<ParamField path="--url" type="string">
+  The URL of the server to upload to.
+  
+  ```bash
+  pixi upload --url https://prefix.dev/my-channel my-package.conda
+  ```
+</ParamField>
+
+<ParamField path="--channel" type="string">
+  The channel name to upload to.
+  
+  ```bash
+  pixi upload --channel my-channel my-package.conda
+  ```
+</ParamField>
+
+<ParamField path="--api-key" type="string">
+  The API key for authentication (not recommended, use pixi auth instead).
+</ParamField>
+
+## Examples
+
+### Upload to Prefix.dev
+
+Upload a package to a Prefix.dev channel:
+
+```bash
+# First authenticate
+pixi auth login https://prefix.dev
+
+# Then upload
+pixi upload --url https://prefix.dev/my-channel my-package-0.1.0-*.conda
+```
+
+### Upload multiple packages
+
+Upload all conda packages in a directory:
+
+```bash
+pixi upload --url https://prefix.dev/my-channel dist/*.conda
+```
+
+### Upload to Anaconda.org
+
+Upload to Anaconda.org:
+
+```bash
+pixi auth login https://anaconda.org
+pixi upload --channel my-channel my-package.conda
+```
+
+## Build and Upload Workflow
+
+Common workflow for building and uploading packages:
+
+```bash
+# Build the package
+pixi build --output-dir ./dist
+
+# Upload the built packages
+pixi upload --url https://prefix.dev/my-channel ./dist/*.conda
+```
+
+## Related Commands
+
+- [`pixi build`](/commands/build) - Build conda packages
+- [`pixi auth`](/commands/auth) - Manage authentication

@@ -1,0 +1,267 @@
+---
+title: pixi tree
+description: Show a dependency tree of workspace packages
+---
+
+Show a tree of workspace dependencies, displaying how packages depend on each other.
+
+## Usage
+
+```bash
+pixi tree [OPTIONS] [REGEX]
+```
+
+**Alias:** `pixi t`
+
+## Arguments
+
+<ParamField path="REGEX" type="string">
+  List only packages matching a regular expression.
+</ParamField>
+
+## Options
+
+<ParamField path="--manifest-path" type="path">
+  The path to the `pixi.toml` or `pyproject.toml` file.
+</ParamField>
+
+<ParamField path="--environment" type="string" shorthand="e">
+  The environment to show the tree for. Defaults to the default environment.
+</ParamField>
+
+<ParamField path="--platform" type="string" shorthand="p">
+  The platform to show the tree for. Defaults to the current platform.
+</ParamField>
+
+<ParamField path="--invert" type="boolean" shorthand="i">
+  Invert the tree and show what depends on the given package (requires a regex argument).
+</ParamField>
+
+<ParamField path="--frozen" type="boolean">
+  Use the lockfile as-is without updating it.
+</ParamField>
+
+<ParamField path="--locked" type="boolean">
+  Check if the lockfile is up-to-date. Errors if the lockfile is out-of-date.
+</ParamField>
+
+<ParamField path="--no-install" type="boolean">
+  Don't install the environment before showing the tree.
+</ParamField>
+
+## Examples
+
+### Show full dependency tree
+
+```bash
+pixi tree
+```
+
+Output:
+```
+python 3.12.0
+├── libffi 3.4.4
+├── openssl 3.1.4
+└── zlib 1.2.13
+numpy 1.26.2
+├── libblas 3.9.0
+└── python 3.12.0
+    ├── libffi 3.4.4
+    ├── openssl 3.1.4
+    └── zlib 1.2.13
+```
+
+### Show dependencies of a specific package
+
+```bash
+pixi tree numpy
+```
+
+### Show reverse dependencies (what depends on a package)
+
+```bash
+pixi tree --invert numpy
+```
+
+Output:
+```
+numpy 1.26.2
+└── pandas 2.1.3
+    └── my-analysis-tool 1.0.0
+```
+
+### Show tree for a specific environment
+
+```bash
+pixi tree --environment production
+```
+
+### Show tree for a different platform
+
+```bash
+pixi tree --platform linux-64
+```
+
+## Display Format
+
+### Color Coding
+
+Dependency names are color-coded:
+- **Green**: Packages that are explicitly specified in the manifest
+- **Yellow**: Conda package versions
+- **Blue**: PyPI package versions
+
+### Tree Symbols
+
+- `├──` - Package has more siblings
+- `└──` - Last package in the list
+
+## Understanding Dependencies
+
+### Direct Dependencies
+
+Packages you explicitly add to your project are shown in **green**.
+
+### Transitive Dependencies
+
+Packages that are installed because they're required by your direct dependencies.
+
+### Example
+
+```toml
+# pixi.toml
+[dependencies]
+pandas = ">=2.0"
+```
+
+Running `pixi tree` shows:
+
+```
+pandas 2.1.3  ← Green (explicit dependency)
+├── numpy 1.26.2  ← Transitive dependency
+├── python 3.12.0  ← Transitive dependency
+└── pytz 2023.3  ← Transitive dependency
+```
+
+## Inverted Tree
+
+The `--invert` flag shows reverse dependencies - which packages depend on a given package:
+
+```bash
+pixi tree --invert python
+```
+
+Output:
+```
+python 3.12.0
+├── numpy 1.26.2
+│   └── pandas 2.1.3
+├── requests 2.31.0
+└── pip 23.3.1
+```
+
+This shows:
+- `numpy` depends on `python`
+- `pandas` depends on `numpy` (which depends on `python`)
+- `requests` depends on `python`
+- `pip` depends on `python`
+
+<Note>
+  The `--invert` flag requires a package name or regex to specify which package's dependents you want to see.
+</Note>
+
+## Filtering
+
+### By Package Name
+
+```bash
+pixi tree numpy
+```
+
+Shows only the `numpy` package and its dependencies.
+
+### By Regex Pattern
+
+```bash
+pixi tree "^py.*"
+```
+
+Shows all packages starting with "py" and their dependencies.
+
+## Use Cases
+
+### Debugging Dependency Conflicts
+
+```bash
+# Find out why a package is installed
+pixi tree --invert problematic-package
+```
+
+### Understanding Package Size
+
+```bash
+# See what dependencies a large package brings
+pixi tree large-package
+```
+
+### Auditing Dependencies
+
+```bash
+# Check what depends on a specific version
+pixi tree --invert python
+```
+
+### Cross-Platform Dependencies
+
+```bash
+# Check Linux dependencies from macOS
+pixi tree --platform linux-64
+```
+
+## Package Sources
+
+The tree distinguishes between:
+- **Conda packages**: Version numbers in yellow
+- **PyPI packages**: Version numbers in blue
+
+## Differences from `pixi list`
+
+| Feature | `pixi tree` | `pixi list` |
+|---------|-------------|-------------|
+| Output | Hierarchical tree | Flat list |
+| Shows relationships | Yes | No |
+| Inverted view | Yes | No |
+| Sorting | No | Yes |
+| JSON output | No | Yes |
+| Field selection | No | Yes |
+
+<Tip>
+  You can use `pixi t` as a shorthand for `pixi tree`.
+</Tip>
+
+## Understanding the Output
+
+### Explicit vs Transitive
+
+```bash
+pixi tree
+```
+
+```
+requests 2.31.0  ← Explicit (in green)
+├── charset-normalizer 3.3.2  ← Transitive
+├── idna 3.6  ← Transitive
+├── urllib3 2.1.0  ← Transitive
+└── certifi 2023.11.17  ← Transitive
+```
+
+### Circular Dependencies
+
+If circular dependencies exist, the tree will show them but avoid infinite recursion.
+
+## Performance
+
+For large dependency trees:
+- Use filtering to focus on specific packages
+- Consider using `pixi list` for a simpler overview
+- Use `--no-install` if you don't need to update the environment

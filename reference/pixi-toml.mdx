@@ -1,0 +1,490 @@
+---
+title: pixi.toml Reference
+description: Complete reference for the pixi.toml manifest file
+---
+
+The `pixi.toml` manifest file is the heart of a pixi workspace. It defines workspaces, packages, dependencies, tasks, environments, and more.
+
+## Overview
+
+A pixi.toml manifest must have one of:
+- `[workspace]` - For workspace definitions
+- `[project]` - For workspace definitions (alias for `[workspace]`)
+- `[package]` - For buildable packages
+
+## Schema Validation
+
+Add schema validation to your pixi.toml:
+
+```toml
+"$schema" = "https://pixi.sh/v0.65.0/schema/manifest/schema.json"
+```
+
+This enables autocompletion and validation in editors that support JSON schemas.
+
+## Workspace Configuration
+
+### `[workspace]`
+
+Defines a pixi workspace (also available as `[project]`).
+
+```toml
+[workspace]
+name = "my-workspace"
+version = "0.1.0"
+description = "My pixi workspace"
+authors = ["Jane Doe <jane@example.com>"]
+channels = ["conda-forge", "pytorch"]
+platforms = ["linux-64", "osx-64", "win-64"]
+```
+
+<ParamField path="name" type="string" required>
+  The name of the workspace.
+  
+  ```toml
+  [workspace]
+  name = "my-workspace"
+  ```
+</ParamField>
+
+<ParamField path="version" type="string">
+  The version of the workspace. Should follow [SemVer](https://semver.org).
+  
+  ```toml
+  [workspace]
+  version = "1.2.3"
+  ```
+</ParamField>
+
+<ParamField path="description" type="string">
+  A short description of the workspace.
+  
+  ```toml
+  [workspace]
+  description = "A machine learning workspace"
+  ```
+</ParamField>
+
+<ParamField path="authors" type="array">
+  List of workspace authors in "Name &lt;email&gt;" format.
+  
+  ```toml
+  [workspace]
+  authors = [
+    "Jane Doe <jane@example.com>",
+    "John Smith <john@example.com>"
+  ]
+  ```
+</ParamField>
+
+<ParamField path="channels" type="array" required>
+  Conda channels to use for dependency resolution.
+  
+  ```toml
+  [workspace]
+  channels = ["conda-forge", "bioconda", "https://prefix.dev/my-channel"]
+  ```
+  
+  With priorities:
+  ```toml
+  [workspace]
+  channels = [
+    { channel = "conda-forge", priority = 0 },
+    { channel = "pytorch", priority = -1 }
+  ]
+  ```
+</ParamField>
+
+<ParamField path="platforms" type="array" required>
+  Target platforms for the workspace.
+  
+  **Valid platforms:**
+  - `linux-64`, `linux-32`, `linux-aarch64`, `linux-armv6l`, `linux-armv7l`, `linux-ppc64`, `linux-ppc64le`, `linux-riscv32`, `linux-riscv64`, `linux-s390x`
+  - `osx-64`, `osx-arm64`
+  - `win-64`, `win-32`, `win-arm64`
+  - `emscripten-wasm32`, `wasi-wasm32`
+  - `noarch`
+  
+  ```toml
+  [workspace]
+  platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+  ```
+</ParamField>
+
+<ParamField path="license" type="string">
+  License identifier (SPDX format recommended).
+  
+  ```toml
+  [workspace]
+  license = "MIT"
+  ```
+</ParamField>
+
+<ParamField path="license-file" type="path">
+  Path to the license file.
+  
+  ```toml
+  [workspace]
+  license-file = "LICENSE"
+  ```
+</ParamField>
+
+<ParamField path="readme" type="path">
+  Path to the README file.
+  
+  ```toml
+  [workspace]
+  readme = "README.md"
+  ```
+</ParamField>
+
+<ParamField path="homepage" type="url">
+  Homepage URL.
+  
+  ```toml
+  [workspace]
+  homepage = "https://example.com"
+  ```
+</ParamField>
+
+<ParamField path="repository" type="url">
+  Repository URL.
+  
+  ```toml
+  [workspace]
+  repository = "https://github.com/example/repo"
+  ```
+</ParamField>
+
+<ParamField path="documentation" type="url">
+  Documentation URL.
+  
+  ```toml
+  [workspace]
+  documentation = "https://docs.example.com"
+  ```
+</ParamField>
+
+## Dependencies
+
+### `[dependencies]`
+
+Conda dependencies for the default environment.
+
+```toml
+[dependencies]
+python = ">=3.11,<3.12"
+numpy = ">=1.20"
+pandas = "*"
+
+# Table format for advanced options
+pytorch = { version = ">=2.0", channel = "pytorch" }
+```
+
+<Accordion title="Simple string format">
+  ```toml
+  [dependencies]
+  python = "3.11.*"
+  numpy = ">=1.20,<2.0"
+  pandas = "*"  # Any version
+  ```
+</Accordion>
+
+<Accordion title="Table format (MatchSpec)">
+  ```toml
+  [dependencies]
+  pytorch = { version = ">=2.0", channel = "pytorch", build = "*cuda*" }
+  custom = { version = "1.0", channel = "https://my-channel.com" }
+  local = { path = "./local-package.tar.bz2" }
+  git = { git = "https://github.com/org/repo", branch = "main" }
+  ```
+  
+  **Available fields:**
+  - `version` - Version constraint (MatchSpec format)
+  - `channel` - Override channel for this package
+  - `build` - Build string constraint
+  - `build-number` - Build number constraint
+  - `file-name` - Exact file name
+  - `subdir` - Platform subdirectory
+  - `md5` / `sha256` - Hash verification
+  - `path` - Local package path
+  - `url` - Package URL
+  - `git` - Git repository URL
+  - `branch` / `tag` / `rev` - Git reference
+</Accordion>
+
+### `[pypi-dependencies]`
+
+PyPI dependencies installed with pip.
+
+```toml
+[pypi-dependencies]
+requests = ">=2.31"
+flask = "==3.0.*"
+
+# Git dependencies
+mypackage = { git = "https://github.com/user/repo", branch = "main" }
+
+# Local dependencies
+local-pkg = { path = "./packages/local-pkg", editable = true }
+
+# With extras
+scikit-learn = { version = ">=1.3", extras = ["tests", "docs"] }
+```
+
+<Accordion title="Version strings">
+  ```toml
+  [pypi-dependencies]
+  requests = "~=2.31.0"
+  flask = ">=3.0,<4.0"
+  django = "==4.2.*"
+  ```
+  
+  Follows [PEP 440](https://peps.python.org/pep-0440/) version specifiers.
+</Accordion>
+
+<Accordion title="Git dependencies">
+  ```toml
+  [pypi-dependencies]
+  # Branch
+  mylib = { git = "https://github.com/user/mylib", branch = "develop" }
+  
+  # Tag
+  other = { git = "https://github.com/user/other", tag = "v1.0.0" }
+  
+  # Commit
+  pkg = { git = "https://github.com/user/pkg", rev = "abc123" }
+  
+  # Subdirectory
+  sub = { git = "https://github.com/user/mono", subdirectory = "packages/sub" }
+  ```
+</Accordion>
+
+<Accordion title="Local dependencies">
+  ```toml
+  [pypi-dependencies]
+  # Regular install
+  mypackage = { path = "./packages/mypackage" }
+  
+  # Editable install
+  dev-pkg = { path = "../dev-package", editable = true }
+  ```
+</Accordion>
+
+<Accordion title="With extras">
+  ```toml
+  [pypi-dependencies]
+  sqlalchemy = { version = ">=2.0", extras = ["postgresql", "asyncio"] }
+  requests = { version = "*", extras = ["security", "socks"] }
+  ```
+</Accordion>
+
+### `[host-dependencies]` and `[build-dependencies]`
+
+Dependencies for building packages. See [Build System documentation](/build/dependency-types).
+
+```toml
+[host-dependencies]
+python = ">=3.8"
+setuptools = "*"
+
+[build-dependencies]
+c-compiler = "*"
+cmake = ">=3.20"
+```
+
+### `[dev]`
+
+Source packages whose dependencies should be installed without building the package itself.
+
+```toml
+[dev]
+my-package = { path = "./my-package" }
+```
+
+## Tasks
+
+### `[tasks]`
+
+Define tasks that can be run with `pixi run`.
+
+```toml
+[tasks]
+# Simple command
+test = "pytest tests/"
+
+# With options
+lint = { cmd = "ruff check src/", cwd = "src", clean-env = false }
+
+# Multiple commands
+build = ["cargo build --release", "cp target/release/bin ."]  
+
+# With dependencies
+ci = { cmd = "echo 'CI complete'", depends-on = ["test", "lint", "build"] }
+
+# With arguments
+greet = { cmd = "echo 'Hello {{ name }}'", args = ["name"] }
+
+# Task with default argument
+serve = { cmd = "python -m http.server {{ port }}", args = [{ arg = "port", default = "8000" }] }
+```
+
+<ParamField path="cmd" type="string | array">
+  Command to execute. Can be a string or array of commands.
+  
+  ```toml
+  [tasks]
+  test = "pytest"
+  build = ["cargo build", "cargo test"]
+  ```
+</ParamField>
+
+<ParamField path="cwd" type="path">
+  Working directory for the task.
+  
+  ```toml
+  [tasks]
+  docs = { cmd = "mkdocs serve", cwd = "docs" }
+  ```
+</ParamField>
+
+<ParamField path="depends-on" type="array">
+  Tasks that must run before this task.
+  
+  ```toml
+  [tasks]
+  build = "cargo build"
+  test = { cmd = "cargo test", depends-on = "build" }
+  deploy = { cmd = "deploy.sh", depends-on = ["build", "test"] }
+  ```
+  
+  With arguments:
+  ```toml
+  [tasks]
+  format = { cmd = "ruff format {{ path }}", args = ["path"] }
+  check = { depends-on = [{ task = "format", args = ["src/"] }] }
+  ```
+</ParamField>
+
+<ParamField path="env" type="object">
+  Environment variables to set.
+  
+  ```toml
+  [tasks]
+  test = { cmd = "pytest", env = { PYTHONPATH = "src:tests" } }
+  ```
+</ParamField>
+
+<ParamField path="clean-env" type="boolean" default="false">
+  Run in a clean environment (only pixi-set variables).
+  
+  ```toml
+  [tasks]
+  isolated = { cmd = "env", clean-env = true }
+  ```
+</ParamField>
+
+<ParamField path="args" type="array">
+  Task arguments that can be passed from the command line.
+  
+  ```toml
+  [tasks]
+  # Simple arguments
+  greet = { cmd = "echo 'Hello {{ name }}'", args = ["name"] }
+  
+  # With defaults
+  serve = { cmd = "python -m http.server {{ port }}", args = [{ arg = "port", default = "8000" }] }
+  
+  # With choices
+  deploy = { cmd = "deploy.sh {{ env }}", args = [{ arg = "env", choices = ["dev", "prod"] }] }
+  ```
+</ParamField>
+
+## Environments
+
+### `[environments]`
+
+Define multiple environments with different feature combinations.
+
+```toml
+[environments]
+# Simple: list of features
+default = ["default", "test"]
+prod = ["default"]
+dev = ["default", "test", "lint", "docs"]
+
+# Advanced: with solve groups
+test = { features = ["test"], solve-group = "test" }
+lint = { features = ["lint"], solve-group = "test" }
+
+# Without default feature
+custom = { features = ["custom"], no-default-feature = true }
+```
+
+<ParamField path="features" type="array">
+  Features to include in this environment.
+  
+  ```toml
+  [environments]
+  dev = { features = ["default", "test", "docs"] }
+  ```
+</ParamField>
+
+<ParamField path="solve-group" type="string">
+  Solve multiple environments together to share dependencies.
+  
+  ```toml
+  [environments]
+  test = { features = ["test"], solve-group = "group1" }
+  lint = { features = ["lint"], solve-group = "group1" }
+  ```
+</ParamField>
+
+<ParamField path="no-default-feature" type="boolean" default="false">
+  Exclude the default feature from this environment.
+  
+  ```toml
+  [environments]
+  minimal = { features = ["core"], no-default-feature = true }
+  ```
+</ParamField>
+
+## Features
+
+### `[feature.<name>]`
+
+Define features that can be composed into environments.
+
+```toml
+[feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+
+[feature.test.tasks]
+test = "pytest tests/"
+cov = "pytest --cov=src tests/"
+
+[feature.docs.dependencies]
+mkdocs = "*"
+mkdocs-material = "*"
+
+[feature.docs.tasks]
+docs = "mkdocs serve"
+build-docs = "mkdocs build"
+```
+
+Features can have:
+- `dependencies` - Conda dependencies
+- `pypi-dependencies` - PyPI dependencies  
+- `tasks` - Feature-specific tasks
+- `channels` - Override channels
+- `platforms` - Supported platforms
+- `system-requirements` - Platform requirements
+- `activation` - Activation scripts/environment
+- `target` - Platform-specific configuration
+
+## See Next
+
+- [pyproject.toml](/reference/pyproject-toml) - Using pixi with Python projects
+- [pixi.lock](/reference/pixi-lock) - Lock file format
+- [Build Configuration(/build/getting-started) - Building packages

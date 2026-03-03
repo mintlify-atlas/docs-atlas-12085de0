@@ -1,0 +1,253 @@
+---
+title: Environments
+description: Understanding environment management and activation in Pixi
+---
+
+Pixi is a tool built to manage environments. An environment is a set of installed packages in a specific location that mimics a global system install. This guide explains how environments work and how to use them effectively.
+
+## What is an Environment?
+
+An environment is a collection of files installed into a specific directory that contains:
+
+- Executables in the `bin` directory
+- Libraries in the `lib` directory
+- Headers in the `include` directory
+- Package metadata in the `conda-meta` directory
+- Environment configuration in the `etc` directory
+
+All Pixi environments are stored by default in `.pixi/envs/` within your workspace, keeping your machine clean and isolated.
+
+## Environment Activation
+
+Activation makes the environment available for use by modifying environment variables and running activation scripts. Pixi provides multiple ways to activate environments:
+
+### Activation Methods
+
+**Shell Activation**
+```bash
+# Start an interactive shell with the environment activated
+pixi shell
+
+# Activate a specific environment
+pixi shell --environment cuda
+```
+
+**Shell Hook**
+```bash
+# Print activation commands for your current shell
+pixi shell-hook
+
+# Apply activation to current shell (bash/zsh)
+eval "$(pixi shell-hook)"
+```
+
+**Run Commands**
+```bash
+# Run a command in the activated environment
+pixi run python script.py
+
+# Run a task in a specific environment
+pixi run --environment test pytest
+```
+
+<Note>
+The `pixi run` command uses its own cross-platform shell and has the ability to run tasks defined in your `pixi.toml`.
+</Note>
+
+### What Happens During Activation?
+
+When you activate an environment, Pixi:
+
+1. **Adds the `bin` directory to `PATH`**
+2. **Sets environment variables:**
+   - `CONDA_PREFIX` - Path to the environment
+   - `PIXI_PROJECT_NAME` - Your project name
+   - `PIXI_PROJECT_ROOT` - Path to your workspace
+   - `PIXI_PROJECT_VERSION` - Project version
+   - `PIXI_PROJECT_MANIFEST` - Path to pixi.toml
+   - `PIXI_ENVIRONMENT_NAME` - Active environment name
+   - `PIXI_ENVIRONMENT_PLATFORMS` - Supported platforms
+   - `PIXI_PROMPT` - Shell prompt prefix
+
+3. **Runs activation scripts** from installed packages
+
+<Tip>
+Activation scripts are platform-specific:
+- **Windows:** Runs under `cmd.exe`
+- **Linux/macOS:** Runs under `bash`
+</Tip>
+
+Here's an example of what `pixi shell-hook` outputs:
+
+```bash
+export PATH="/home/user/development/pixi/.pixi/envs/default/bin:/home/user/.local/bin:..."
+export CONDA_PREFIX="/home/user/development/pixi/.pixi/envs/default"
+export PIXI_PROJECT_NAME="pixi"
+export PIXI_PROJECT_ROOT="/home/user/development/pixi"
+export PIXI_PROJECT_VERSION="0.12.0"
+export PIXI_PROJECT_MANIFEST="/home/user/development/pixi/pixi.toml"
+export CONDA_DEFAULT_ENV="pixi"
+export PIXI_ENVIRONMENT_PLATFORMS="osx-64,linux-64,win-64,osx-arm64"
+export PIXI_ENVIRONMENT_NAME="default"
+export PIXI_PROMPT="(pixi) "
+. "/home/user/development/pixi/.pixi/envs/default/etc/conda/activate.d/activate-gcc_linux-64.sh"
+. "/home/user/development/pixi/.pixi/envs/default/etc/conda/activate.d/libglib_activate.sh"
+```
+
+## Custom Activation
+
+You can customize activation by adding your own scripts and environment variables to the `pixi.toml`:
+
+```toml
+[activation]
+scripts = ["setup.sh"]
+
+[activation.env]
+API_KEY = "your-key-here"
+DEBUG_MODE = "true"
+```
+
+<Info>
+Activation scripts and environment variables are applied by the platform's shell during activation, before any task runs.
+</Info>
+
+## Environment Structure
+
+Environments are stored in `.pixi/envs/` with a directory for each environment:
+
+```
+.pixi/
+└── envs/
+    ├── cuda/
+    │   ├── bin/
+    │   ├── conda-meta/
+    │   ├── etc/
+    │   ├── include/
+    │   └── lib/
+    └── default/
+        ├── bin/
+        ├── conda-meta/
+        ├── etc/
+        ├── include/
+        └── lib/
+```
+
+### Environment Metadata
+
+Each environment contains a metadata file at `conda-meta/pixi` with:
+
+```json
+{
+  "manifest_path": "/home/user/dev/pixi/pixi.toml",
+  "environment_name": "default",
+  "pixi_version": "0.34.0",
+  "environment_lock_file_hash": "4f36ee620f10329d"
+}
+```
+
+The `environment_lock_file_hash` is used to quickly check if the environment is in sync with the lock file, speeding up activation.
+
+<Warning>
+These are conda environments managed by Pixi. Never manually edit the environment files - always modify your `pixi.toml` instead.
+</Warning>
+
+## Environment Solving
+
+When you run commands that use the environment, Pixi checks if it's in sync with `pixi.lock`. If not, Pixi solves the environment:
+
+1. Retrieves the best set of packages for your dependencies
+2. Writes the solution to `pixi.lock`
+3. Installs the packages into the environment
+
+Pixi uses advanced solving algorithms:
+- **Conda packages:** Solved by [`rattler`](https://github.com/conda/rattler) using the [`resolvo`](https://github.com/mamba-org/resolvo) SAT solver
+- **PyPI packages:** Solved by [`uv`](https://github.com/astral-sh/uv) with lazy metadata resolution
+
+<Tip>
+For the best Pixi experience, prefer conda dependencies over PyPI dependencies when packages are available in both ecosystems.
+</Tip>
+
+## Package Caching and De-duplication
+
+Pixi caches all downloaded packages in a global cache directory:
+
+- **Linux:** `$XDG_CACHE_HOME/rattler` or `$HOME/.cache/rattler`
+- **macOS:** `$HOME/Library/Caches/rattler`
+- **Windows:** `%LOCALAPPDATA%\rattler`
+
+When installing packages, Pixi uses **hard links** (or **reflinks** on supported filesystems) instead of copying files. This means:
+
+- Multiple environments share the same package files on disk
+- Packages are effectively stored only once
+- Huge disk space savings, especially with large packages like CUDA toolkits
+
+<Accordion title="Hard links vs Reflinks">
+- **Hard links** point multiple directory entries to the same data on disk. This is safe because Pixi environments are read-only.
+- **Reflinks** (copy-on-write links) behave like instant copies that only use new disk space when modified. Safer than hard links - if a file is accidentally modified, only that environment's copy is affected.
+- **Copying** is used as a fallback when the cache and workspace are on different mount points.
+</Accordion>
+
+## Cleaning Environments
+
+Remove environments to free up space or force a fresh install:
+
+```bash
+# Clean all environments
+pixi clean
+
+# Clean a specific environment
+pixi clean --environment cuda
+
+# Manual cleanup
+rm -rf .pixi/envs
+```
+
+<Info>
+Pixi will automatically recreate environments when needed after cleaning.
+</Info>
+
+## Detached Environments
+
+By default, environments are stored inside `.pixi/envs/` in your workspace. You can enable [detached environments](../reference/configuration.md#detached-environments) to store them outside your workspace directory.
+
+## Example: Multi-Environment Workspace
+
+Here's a real-world example from a machine learning project with different hardware requirements:
+
+```toml
+[workspace]
+name = "ml-project"
+channels = ["conda-forge", "pytorch"]
+platforms = ["linux-64", "osx-arm64"]
+
+[dependencies]
+python = "3.11.*"
+pytorch = { version = ">=2.0.1", channel = "pytorch" }
+
+[feature.cuda]
+platforms = ["linux-64"]
+system-requirements = { cuda = "12.1" }
+
+[feature.cuda.dependencies]
+pytorch-cuda = { version = "12.1.*", channel = "pytorch" }
+
+[feature.mlx]
+platforms = ["osx-arm64"]
+
+[feature.mlx.dependencies]
+mlx = ">=0.16.0"
+
+[environments]
+cuda = ["cuda"]
+mlx = ["mlx"]
+```
+
+Use different environments for different hardware:
+
+```bash
+# On a CUDA machine
+pixi run --environment cuda train-model
+
+# On Apple Silicon
+pixi run --environment mlx train-model
+```

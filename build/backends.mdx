@@ -1,0 +1,518 @@
+---
+title: Build Backend Overview
+description: Available build backends and how to use them with Pixi
+---
+
+Build backends decouple package building from Pixi, providing language-specific build implementations through a standardized protocol.
+
+## What Are Build Backends?
+
+Build backends are executables that:
+- Follow a specific protocol for communication with Pixi
+- Handle language-specific build logic
+- Convert projects into conda packages
+- Are decoupled from Pixi's manifest specification
+
+This design allows backends to evolve independently from Pixi itself.
+
+## Available Backends
+
+<CardGroup cols={2}>
+
+<Card title="pixi-build-cmake" icon="hammer" href="./backends/pixi-build-cmake">
+For CMake-based C/C++ projects. Automatically provides CMake, Ninja, and compilers.
+</Card>
+
+<Card title="pixi-build-python" icon="python" href="./backends/pixi-build-python">
+For Python packages using PEP 517 build backends like Hatchling or setuptools.
+</Card>
+
+<Card title="pixi-build-rattler-build" icon="package" href="./backends/pixi-build-rattler-build">
+For direct recipe.yaml builds with full control over the build process.
+</Card>
+
+<Card title="pixi-build-ros" icon="robot" href="./backends/pixi-build-ros">
+For ROS (Robot Operating System) packages using colcon.
+</Card>
+
+<Card title="pixi-build-rust" icon="rust" href="./backends/pixi-build-rust">
+For Cargo-based Rust applications and libraries.
+</Card>
+
+<Card title="pixi-build-mojo" icon="fire" href="./backends/pixi-build-mojo">
+For Mojo applications and packages.
+</Card>
+
+</CardGroup>
+
+<Note>
+All backends are available through [conda-forge](https://prefix.dev/channels/conda-forge) and work across Linux, macOS, and Windows.
+</Note>
+
+## Quick Comparison
+
+| Backend | Use Case | Auto-installed Tools | Configuration |
+|---------|----------|---------------------|---------------|
+| **cmake** | C/C++ projects | CMake, Ninja, compilers | CMakeLists.txt |
+| **python** | Python packages | None | pyproject.toml + pixi.toml |
+| **rattler-build** | Custom recipes | None | recipe.yaml |
+| **ros** | ROS packages | colcon, rosdep | package.xml |
+| **rust** | Rust projects | Rust toolchain | Cargo.toml |
+| **mojo** | Mojo projects | Mojo toolchain | magic.toml |
+
+## Installing a Backend
+
+Specify the backend in your manifest:
+
+```toml title="pixi.toml"
+[package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+```
+
+Pixi automatically installs the backend from conda channels.
+
+### Using Custom Backend Channels
+
+For the latest features, use the dedicated backend channel:
+
+```toml title="pixi.toml"
+[package.build.backend]
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+name = "pixi-build-python"
+version = "0.4.*"
+```
+
+<Note>
+The `pixi-build-backends` channel contains pre-release versions with the latest features.
+</Note>
+
+## Common Backend Configurations
+
+<CodeGroup>
+
+```toml Python Package
+[package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+
+[package.host-dependencies]
+hatchling = "*"
+
+[package.run-dependencies]
+rich = ">=13.9"
+```
+
+```toml C++ Package
+[package.build]
+backend = { name = "pixi-build-cmake", version = "0.3.*" }
+
+[package.host-dependencies]
+sdl2 = "*"
+```
+
+```toml Rust Package
+[package.build]
+backend = { name = "pixi-build-rust", version = "*" }
+
+[package.host-dependencies]
+openssl = "*"
+```
+
+```toml Custom Recipe
+[package.build]
+backend = { name = "pixi-build-rattler-build", version = "0.3.*" }
+
+# Configuration in recipe.yaml
+```
+
+</CodeGroup>
+
+## Backend-Specific Configuration
+
+Each backend supports custom configuration through `[package.build.config]`:
+
+### CMake Backend
+
+```toml
+[package.build.config]
+extra-args = [
+  "-DCMAKE_BUILD_TYPE=Release",
+  "-DUSE_OPENMP=ON",
+  "-DBUILD_TESTING=OFF"
+]
+```
+
+### Python Backend
+
+```toml
+[package.build.config]
+noarch = true      # Platform-independent package
+editable = true    # Editable install
+skip-install = false
+```
+
+### Rust Backend
+
+```toml
+[package.build.config]
+features = ["full", "tokio"]
+release = true
+```
+
+See individual backend documentation for complete options.
+
+## Overriding Build Backends
+
+For development, you can override backends:
+
+### Override Specific Backends
+
+```bash
+export PIXI_BUILD_BACKEND_OVERRIDE="pixi-build-cmake=/path/to/bin,pixi-build-python"
+pixi build
+```
+
+Format: `{name}={path}` with multiple backends separated by commas.
+
+- `pixi-build-cmake=/path/to/bin` - Use local executable
+- `pixi-build-python` - Use version from PATH
+
+### Override All Backends
+
+```bash
+export PIXI_BUILD_BACKEND_OVERRIDE_ALL=1
+pixi build
+```
+
+This assumes all backends are in PATH and skips isolated installation.
+
+<Warning>
+Backend overrides are for development only. Don't use in production or CI/CD.
+</Warning>
+
+## Debugging Builds
+
+### Inspecting Generated Recipes
+
+Backends generate rattler-build recipes stored in your project:
+
+```bash
+# General recipe (all outputs)
+.pixi/build/work/<package-name>--<hash>/debug/recipe.yaml
+.pixi/build/work/<package-name>--<hash>/debug/variants.yaml
+
+# Variant-specific recipe (single output)
+.pixi/build/work/<package-name>--<hash>/debug/recipe/<variant_hash>/recipe.yaml
+.pixi/build/work/<package-name>--<hash>/debug/recipe/<variant_hash>/variants.yaml
+```
+
+### Rebuilding with rattler-build
+
+Rerun a build directly:
+
+<CodeGroup>
+
+```bash Navigate to Recipe
+cd .pixi/build/work/<package-name>--<hash>/debug/recipe/<variant_hash>/
+rattler-build build
+```
+
+```bash Point to Recipe
+rattler-build build --recipe .pixi/build/work/<package-name>--<hash>/debug/recipe/<variant_hash>/
+```
+
+</CodeGroup>
+
+This helps:
+- Inspect exact build recipes
+- Debug build failures
+- Understand backend behavior
+- Compare variant configurations
+
+<Note>
+The `<variant_hash>` ensures each unique combination of build variants gets its own recipe directory.
+</Note>
+
+### Examining JSON-RPC Communication
+
+Find debug files in the recipe directory:
+
+```bash
+.pixi/build/work/<package-name>--<hash>/debug/
+├── project_model.json      # Your project model
+├── build_params.json       # Build request
+└── build_response.json     # Build response
+```
+
+These files show the exact communication between Pixi and the backend.
+
+## Backend Development
+
+Backends implement a protocol for:
+
+1. **Manifest protocol** - Understanding project configuration
+2. **Build protocol** - Executing builds
+3. **Recipe generation** - Creating rattler-build recipes
+
+### Creating a Custom Backend
+
+Backends must:
+- Accept JSON-RPC requests on stdin
+- Return JSON-RPC responses on stdout
+- Implement required protocol methods
+- Generate valid rattler-build recipes
+
+See [pixi-build-backends](https://github.com/prefix-dev/pixi-build-backends) for examples.
+
+## Backend Selection Guide
+
+<Steps>
+
+### Identify Your Project Type
+
+**Python project with pyproject.toml?**
+→ Use `pixi-build-python`
+
+**C/C++ project with CMakeLists.txt?**
+→ Use `pixi-build-cmake`
+
+**Rust project with Cargo.toml?**
+→ Use `pixi-build-rust`
+
+**ROS package with package.xml?**
+→ Use `pixi-build-ros`
+
+**Need full control?**
+→ Use `pixi-build-rattler-build`
+
+### Check Language-Specific Requirements
+
+Some backends need additional configuration:
+
+```toml
+# Python: specify PEP 517 backend
+[package.host-dependencies]
+hatchling = "*"
+
+# C++: usually none (cmake backend provides tools)
+[package.host-dependencies]
+# Empty or specific libraries
+
+# Rust: may need system dependencies
+[package.host-dependencies]
+openssl = "*"
+```
+
+### Consider Build Complexity
+
+**Simple projects** - Use language-specific backends
+**Complex builds** - Consider `pixi-build-rattler-build` for full control
+**Multi-language** - Use multiple packages with different backends
+
+</Steps>
+
+## Advanced Topics
+
+### Key Concepts
+
+<Card title="Compilers" icon="wrench" href="./key_concepts/compilers">
+How pixi-build integrates with conda-forge's compiler infrastructure for cross-platform builds.
+</Card>
+
+### Multiple Backends in a Workspace
+
+Different packages can use different backends:
+
+```text
+workspace/
+├── pixi.toml              # Python package
+│   [package.build]
+│   backend = { name = "pixi-build-python" }
+└── packages/
+    └── cpp_math/          # C++ package
+        [package.build]
+        backend = { name = "pixi-build-cmake" }
+```
+
+### Backend Versioning
+
+Pin backends for reproducible builds:
+
+```toml
+# Exact version
+[package.build]
+backend = { name = "pixi-build-python", version = "==0.4.5" }
+
+# Version range
+[package.build]
+backend = { name = "pixi-build-python", version = ">=0.4,<0.5" }
+
+# Latest version
+[package.build]
+backend = { name = "pixi-build-python", version = "*" }
+```
+
+## Real-World Examples
+
+### Mixed Python and C++
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64", "osx-arm64", "win-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+my_package = { path = "." }
+
+[package]
+name = "my_package"
+version = "0.1.0"
+
+# Python backend for the main package
+[package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+
+[package.host-dependencies]
+hatchling = "*"
+
+# C++ dependency uses cmake backend
+[package.run-dependencies]
+cpp_core = { path = "packages/cpp_core" }
+```
+
+```toml title="packages/cpp_core/pixi.toml"
+[package]
+name = "cpp_core"
+version = "0.1.0"
+
+# CMake backend for C++ package
+[package.build]
+backend = { name = "pixi-build-cmake", version = "0.3.*" }
+
+[package.host-dependencies]
+nanobind = "*"
+python = ">=3.11"
+```
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Pin backend versions">
+Use specific version ranges for reproducible builds:
+
+```toml
+# Good
+backend = { name = "pixi-build-python", version = "0.4.*" }
+
+# Risky
+backend = { name = "pixi-build-python", version = "*" }
+```
+</Accordion>
+
+<Accordion title="Use appropriate backend for language">
+Don't force a backend:
+
+```toml
+# Good - Python project uses Python backend
+[package.build]
+backend = { name = "pixi-build-python" }
+
+# Bad - Using rattler-build when language backend exists
+[package.build]
+backend = { name = "pixi-build-rattler-build" }
+```
+</Accordion>
+
+<Accordion title="Keep backend config minimal">
+Let backends handle defaults:
+
+```toml
+# Good - minimal config
+[package.build]
+backend = { name = "pixi-build-cmake", version = "0.3.*" }
+
+# Unnecessary - cmake backend provides these
+[package.build-dependencies]
+cmake = "*"
+ninja = "*"
+```
+</Accordion>
+
+<Accordion title="Document backend choices">
+Comment why you chose a backend:
+
+```toml
+# Using rattler-build for complex multi-step build
+[package.build]
+backend = { name = "pixi-build-rattler-build", version = "0.3.*" }
+```
+</Accordion>
+
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="pixi-build-cmake" icon="hammer" href="./backends/pixi-build-cmake">
+Complete CMake backend documentation
+</Card>
+
+<Card title="pixi-build-python" icon="python" href="./backends/pixi-build-python">
+Complete Python backend documentation
+</Card>
+
+<Card title="Dependency Types" icon="link" href="./dependency-types">
+How backends use different dependencies
+</Card>
+
+<Card title="Build Variants" icon="code-branch" href="./variants">
+Building multiple configurations
+</Card>
+
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Backend not found">
+Ensure backend channel is included:
+
+```toml
+[package.build.backend]
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+name = "pixi-build-python"
+```
+</Accordion>
+
+<Accordion title="Build fails with backend error">
+Check generated recipe:
+
+```bash
+cat .pixi/build/work/<package>--<hash>/debug/recipe/<variant>/recipe.yaml
+```
+
+Try rebuilding with rattler-build directly for better error messages.
+</Accordion>
+
+<Accordion title="Backend version conflicts">
+Explicitly specify compatible versions:
+
+```toml
+[package.build]
+backend = { name = "pixi-build-cmake", version = ">=0.3,<0.4" }
+```
+</Accordion>
+
+<Accordion title="Different backend needed">
+Some backends may not support all features. Consider:
+- Switching to `pixi-build-rattler-build` for full control
+- Contributing to the backend repository
+- Opening an issue for missing features
+</Accordion>

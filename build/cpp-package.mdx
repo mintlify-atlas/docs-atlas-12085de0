@@ -1,0 +1,467 @@
+---
+title: Building C++ Packages
+description: Build C++ packages with CMake and pixi-build-cmake
+---
+
+Learn how to build C++ packages using CMake and integrate them with Pixi, including Python bindings with nanobind.
+
+<Warning>
+`pixi-build` is a preview feature and will change until stabilized. Keep this in mind when using it for your projects.
+</Warning>
+
+## Why Build C++ with Pixi?
+
+Pixi's C++ build support enables:
+
+- **Native performance** with cross-platform builds
+- **Python bindings** using nanobind or pybind11
+- **Mixed language projects** combining C++ and Python
+- **Conda ecosystem** for C++ dependencies like SDL2, Boost, etc.
+
+## Creating a C++ Package with Python Bindings
+
+<Steps>
+
+### Create the Project Structure
+
+Initialize a new Pixi project:
+
+```bash
+pixi init cpp_math
+cd cpp_math
+```
+
+Create the source structure:
+
+```bash
+mkdir -p src
+```
+
+```text
+cpp_math/
+├── CMakeLists.txt
+├── pixi.toml
+├── .gitignore
+└── src/
+    └── math.cpp
+```
+
+### Write the C++ Code
+
+Create a simple C++ module with Python bindings:
+
+```cpp title="src/math.cpp"
+#include <nanobind/nanobind.h>
+
+int add(int a, int b) { return a + b; }  // (1)!
+
+NB_MODULE(cpp_math, m)
+{
+    m.def("add", &add);  // (2)!
+}
+```
+
+1. Define a C++ function to add two numbers
+2. Bind the function to Python using nanobind
+
+### Configure CMake
+
+Set up the build configuration:
+
+```cmake title="CMakeLists.txt"
+cmake_minimum_required(VERSION 3.20...3.27)
+project(cpp_math)
+
+find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)  # (1)!
+
+execute_process(
+  COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT
+)  # (2)!
+
+execute_process(
+    COMMAND ${Python_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_path('purelib'))"
+    OUTPUT_VARIABLE PYTHON_SITE_PACKAGES
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)  # (3)!
+
+find_package(nanobind CONFIG REQUIRED)  # (4)!
+
+nanobind_add_module(${PROJECT_NAME} src/math.cpp)  # (5)!
+
+install(  # (6)!
+    TARGETS ${PROJECT_NAME}
+    EXPORT ${PROJECT_NAME}Targets
+    LIBRARY DESTINATION ${PYTHON_SITE_PACKAGES}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${BINDIR}
+)
+```
+
+1. Find Python 3.8+ (actual version comes from environment)
+2. Locate nanobind from the conda environment
+3. Find the Python site-packages directory (version-independent)
+4. Configure nanobind for the build
+5. Use the source file to create the module
+6. Install the bindings to the correct location
+
+### Configure Pixi Build
+
+Create the Pixi manifest:
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["osx-arm64", "linux-64", "osx-64", "win-64"]
+preview = ["pixi-build"]  # (1)!
+
+[dependencies]  # (2)!
+cpp_math = { path = "." }
+python = "*"
+
+[tasks]
+start = "python -c 'import cpp_math as b; print(b.add(1, 2))'"  # (3)!
+
+[package]  # (4)!
+name = "cpp_math"
+version = "0.1.0"
+
+[package.build]  # (5)!
+backend = { name = "pixi-build-cmake", version = "0.3.*" }
+
+[package.build.config]
+extra-args = ["-DCMAKE_BUILD_TYPE=Release"]  # (6)!
+
+[package.host-dependencies]
+cmake = "3.20.*"   # (7)!
+nanobind = "2.4.*" # (8)!
+python = "3.12.*"  # (9)!
+```
+
+1. Enable the pixi-build preview feature
+2. Add the package and Python as workspace dependencies
+3. Create a test task
+4. Define package metadata
+5. Use pixi-build-cmake backend
+6. Optional CMake arguments for configuration
+7. Override CMake version if needed
+8. Nanobind for Python bindings
+9. Python version for the build
+
+<Note>
+When using `pixi-build-cmake`, you don't need to specify compilers - the backend installs CMake, Ninja, and C++ compilers automatically.
+</Note>
+
+### Build and Test
+
+Run your package:
+
+```bash
+pixi run start
+```
+
+Output:
+```text
+3
+```
+
+</Steps>
+
+## Building C++ Applications
+
+### SDL2 Example
+
+Here's a complete example building an SDL2 application:
+
+```toml title="pixi.toml"
+[workspace]
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+preview = ["pixi-build"]
+
+[dependencies]
+sdl_example = { path = "." }
+
+[tasks.start]
+cmd = "sdl_example"
+description = "Run the SDL example executable"
+
+[tasks]
+test = "sdl_example -h"
+
+[package]
+authors = ["Bas Zalmstra <bas@prefix.dev>"]
+description = "Simple C++ executable with SDL2"
+name = "sdl_example"
+version = "0.1.0"
+
+[package.build.backend]
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+name = "pixi-build-cmake"
+version = "0.3.*"
+
+[package.host-dependencies]
+sdl2 = ">=2.26.5,<3.0"
+```
+
+Corresponding CMakeLists.txt:
+
+```cmake title="CMakeLists.txt"
+cmake_minimum_required(VERSION 3.20)
+project(sdl_example)
+
+find_package(SDL2 REQUIRED)
+
+add_executable(${PROJECT_NAME} src/main.cpp)
+target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
+
+install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+```
+
+## Advanced Configuration
+
+### Custom CMake Arguments
+
+Pass additional CMake configuration:
+
+```toml
+[package.build.config]
+extra-args = [
+  "-DCMAKE_BUILD_TYPE=Release",
+  "-DUSE_CUSTOM_FEATURE=ON",
+  "-DENABLE_TESTING=OFF"
+]
+```
+
+### Specifying Compilers
+
+<Note>
+The `pixi-build-cmake` backend automatically provides compilers. However, for special cases:
+</Note>
+
+```toml
+[package.build-dependencies]
+cxx-compiler = "*"
+c-compiler = "*"
+```
+
+See [dependency types](./dependency-types) for when to use build vs host dependencies.
+
+### Cross-Compilation Example
+
+For cross-compilation from macOS ARM to Linux x86_64:
+
+```toml
+[workspace]
+platforms = ["linux-64"]  # Target platform
+
+[package.host-dependencies]
+sdl2 = "*"  # Will use linux-64 binaries
+
+[package.build-dependencies]
+cmake = "*"  # Will use osx-arm64 binaries
+```
+
+## Using Git Sources
+
+Build from a git repository:
+
+```toml title="pixi.toml"
+[package.build.source]
+git = "https://github.com/prefix-dev/pixi-build-testsuite.git"
+subdirectory = "tests/data/pixi_build/cpp-with-path-to-source/project"
+
+[package.build.backend]
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+name = "pixi-build-cmake"
+version = "*"
+
+[package]
+name = "sdl_example"
+version = "0.1.0"
+
+[package.host-dependencies]
+sdl2 = ">=2.26.5,<3.0"
+
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["osx-arm64", "linux-64", "win-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+sdl_example = { path = "." }
+```
+
+See [package source configuration](./package-source) for more options.
+
+## Dependency Types for C++
+
+<Accordion title="Build Dependencies">
+Tools that run on your build machine:
+
+```toml
+[package.build-dependencies]
+cmake = "*"      # Runs on build machine
+ninja = "*"      # Runs on build machine
+```
+
+<Note>
+For `pixi-build-cmake`, these are provided automatically.
+</Note>
+</Accordion>
+
+<Accordion title="Host Dependencies">
+Libraries and headers for the target platform:
+
+```toml
+[package.host-dependencies]
+sdl2 = "*"       # Target platform library
+boost = "*"      # Target platform library
+python = "3.12.*" # For Python bindings
+nanobind = "*"   # For Python bindings
+```
+
+These must match your target platform, not build platform.
+</Accordion>
+
+<Accordion title="Run Dependencies">
+Libraries needed at runtime:
+
+```toml
+[package.run-dependencies]
+qt = "*"         # Runtime library
+```
+
+Many conda packages have `run-exports` that automatically add run dependencies based on host dependencies.
+</Accordion>
+
+## Real-World Example: Mixed Project
+
+### Directory Structure
+
+```text
+project/
+├── pixi.toml
+├── pyproject.toml
+├── src/
+│   └── python_rich/
+│       └── __init__.py
+└── packages/
+    └── cpp_math/
+        ├── pixi.toml
+        ├── CMakeLists.txt
+        └── src/
+            └── math.cpp
+```
+
+### Root pixi.toml
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["win-64", "linux-64", "osx-arm64", "osx-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+python_rich = { path = "." }
+
+[tasks]
+start = "rich-example-main"
+
+[package]
+name = "python_rich"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+
+[package.host-dependencies]
+hatchling = "==1.26.3"
+
+[package.run-dependencies]
+cpp_math = { path = "packages/cpp_math" }  # C++ dependency!
+rich = "13.9.*"
+```
+
+### Using C++ from Python
+
+```python title="src/python_rich/__init__.py"
+import cpp_math
+from rich.console import Console
+from rich.table import Table
+
+def main() -> None:
+    # Use the C++ function
+    result = cpp_math.add(1, 2)
+    console = Console()
+    console.print(f"C++ says: 1 + 2 = {result}")
+```
+
+See the [workspace guide](./workspace) for complete multi-package examples.
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Workspaces" icon="folder-tree" href="./workspace">
+Combine C++ and Python packages
+</Card>
+
+<Card title="Dependency Types" icon="link" href="./dependency-types">
+Understand build, host, and run dependencies
+</Card>
+
+<Card title="Package Sources" icon="code-branch" href="./package-source">
+Build from git or custom paths
+</Card>
+
+<Card title="Build Variants" icon="sliders" href="./variants">
+Build for multiple Python versions
+</Card>
+
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="CMake can't find dependencies">
+Ensure dependencies are in `host-dependencies`:
+
+```toml
+[package.host-dependencies]
+sdl2 = "*"
+boost = "*"
+```
+
+The conda environment sets CMAKE_PREFIX_PATH automatically.
+</Accordion>
+
+<Accordion title="Python bindings not found">
+Check the install path in CMakeLists.txt uses `PYTHON_SITE_PACKAGES`:
+
+```cmake
+install(
+    TARGETS ${PROJECT_NAME}
+    LIBRARY DESTINATION ${PYTHON_SITE_PACKAGES}
+)
+```
+</Accordion>
+
+<Accordion title="Cross-compilation issues">
+Verify platform settings:
+- Build platform: Your machine's architecture
+- Host/target platform: Where the code will run
+
+```toml
+[workspace]
+platforms = ["linux-64"]  # Target platform
+```
+</Accordion>

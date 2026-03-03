@@ -1,0 +1,209 @@
+---
+title: pixi shell-hook
+description: Print the pixi environment activation script
+---
+
+Print the pixi environment activation script. You can source the script to activate the environment without needing pixi itself.
+
+## Usage
+
+```bash
+pixi shell-hook [OPTIONS]
+```
+
+## Options
+
+<ParamField path="--shell" type="string" shorthand="s">
+  Sets the shell for which to generate the activation script.
+  
+  Options: `bash`, `zsh`, `xonsh`, `cmd`, `powershell`, `fish`, `nushell`
+  
+  If not specified, pixi will auto-detect the shell from the parent process or environment.
+</ParamField>
+
+<ParamField path="--manifest-path" type="path">
+  The path to the `pixi.toml` or `pyproject.toml` file.
+</ParamField>
+
+<ParamField path="--frozen" type="boolean">
+  Install the environment as defined in the lockfile, without updating it.
+</ParamField>
+
+<ParamField path="--locked" type="boolean">
+  Check if the lockfile is up-to-date before installing the environment. Errors if the lockfile is out-of-date.
+</ParamField>
+
+<ParamField path="--environment" type="string" shorthand="e">
+  The environment to activate in the script.
+</ParamField>
+
+<ParamField path="--json" type="boolean">
+  Emit the environment variables set by running the activation as JSON.
+  
+  This option is mutually exclusive with `--shell`.
+</ParamField>
+
+<ParamField path="--no-install" type="boolean">
+  Don't install the environment, only generate the activation script.
+</ParamField>
+
+<ParamField path="--change-ps1" type="boolean" default="true">
+  Include prompt modification in the activation script (can be configured in the global config).
+</ParamField>
+
+## Examples
+
+### Print activation script for current shell
+
+```bash
+pixi shell-hook
+```
+
+### Print activation script for a specific shell
+
+```bash
+pixi shell-hook --shell bash
+```
+
+### Source the activation script
+
+<CodeGroup>
+
+```bash Bash/Zsh
+eval "$(pixi shell-hook)"
+```
+
+```fish Fish
+pixi shell-hook --shell fish | source
+```
+
+```powershell PowerShell
+pixi shell-hook --shell powershell | Out-String | Invoke-Expression
+```
+
+```nushell Nushell
+pixi shell-hook --shell nushell | save ~/.pixi-env.nu
+source ~/.pixi-env.nu
+```
+
+</CodeGroup>
+
+### Get environment variables as JSON
+
+```bash
+pixi shell-hook --json
+```
+
+Output:
+```json
+{
+  "environment_variables": {
+    "PATH": "/path/to/env/bin:/usr/bin:/bin",
+    "CONDA_PREFIX": "/path/to/env",
+    "PIXI_ENVIRONMENT_NAME": "default",
+    "PIXI_PROJECT_ROOT": "/path/to/project"
+  }
+}
+```
+
+### Activate environment in a specific shell
+
+```bash
+# Generate bash activation script
+pixi shell-hook --shell bash > activate.sh
+
+# Source it later
+source activate.sh
+```
+
+## Use Cases
+
+### CI/CD Integration
+
+Activate pixi environments in CI without keeping pixi in the PATH:
+
+```yaml
+- name: Activate environment
+  run: eval "$(pixi shell-hook)"
+
+- name: Run tests
+  run: pytest
+```
+
+### Custom Shell Integration
+
+Integrate pixi activation into your shell's RC file:
+
+```bash
+# In ~/.bashrc or ~/.zshrc
+if [ -f "pixi.toml" ]; then
+  eval "$(pixi shell-hook)"
+fi
+```
+
+### Docker Containers
+
+Activate environments in Docker without keeping the pixi binary:
+
+```dockerfile
+RUN pixi install
+RUN pixi shell-hook > /activate.sh
+
+CMD ["/bin/bash", "-c", "source /activate.sh && python app.py"]
+```
+
+### Environment Variable Inspection
+
+Inspect what environment variables pixi sets:
+
+```bash
+pixi shell-hook --json | jq '.environment_variables'
+```
+
+## Supported Shells
+
+The command generates activation scripts for:
+
+- **bash** - Bourne Again Shell
+- **zsh** - Z Shell
+- **fish** - Friendly Interactive Shell
+- **xonsh** - Python-powered shell
+- **powershell** - PowerShell (Windows/Unix)
+- **cmd** - Windows Command Prompt
+- **nushell** - A new type of shell
+
+<Note>
+  If `--shell` is not specified, pixi will attempt to detect your shell from the parent process or environment variables.
+</Note>
+
+## JSON Output Format
+
+When using `--json`, the output contains:
+
+```json
+{
+  "environment_variables": {
+    "PATH": "...",
+    "CONDA_PREFIX": "...",
+    "PIXI_ENVIRONMENT_NAME": "...",
+    "PIXI_PROJECT_ROOT": "...",
+    // ... other environment variables
+  }
+}
+```
+
+This format is useful for:
+- Parsing in scripts
+- IDE integrations
+- Debugging environment setups
+
+## Differences from `pixi shell`
+
+- `pixi shell-hook` **prints** the activation script
+- `pixi shell` **executes** an interactive shell
+- Both activate the same environment
+- `shell-hook` is useful for integration scenarios where you need the raw activation commands
+
+<Tip>
+  Use `pixi shell-hook --json` to inspect exactly what environment variables pixi sets, which is helpful for debugging and integration work.
+</Tip>

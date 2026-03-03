@@ -1,0 +1,346 @@
+---
+title: 'Authentication'
+description: 'Authenticate Pixi with private conda channels and PyPI registries'
+---
+
+Pixi supports authentication with various package repositories including prefix.dev, private Quetz instances, anaconda.org, and PyPI registries.
+
+## Authentication Methods
+
+Pixi supports multiple authentication methods:
+
+- **Bearer Token** - Used by prefix.dev
+- **Conda Token** - Used by anaconda.org and Quetz
+- **Basic HTTP Auth** - Username and password
+- **S3 Credentials** - For S3-based channels
+- **Keyring** - For PyPI registries
+
+## Conda Channel Authentication
+
+### Command Syntax
+
+```bash
+pixi auth login [OPTIONS] <HOST>
+
+Arguments:
+  <HOST>  The host to authenticate with (e.g. repo.prefix.dev)
+
+Options:
+  --token <TOKEN>                            Bearer token (prefix.dev)
+  --username <USERNAME>                      Basic HTTP auth username
+  --password <PASSWORD>                      Basic HTTP auth password
+  --conda-token <CONDA_TOKEN>                Anaconda.org/Quetz token
+  --s3-access-key-id <S3_ACCESS_KEY_ID>      S3 access key ID
+  --s3-secret-access-key <SECRET_KEY>        S3 secret access key
+  --s3-session-token <SESSION_TOKEN>         S3 session token
+```
+
+### Authentication Examples
+
+<CodeGroup>
+```bash prefix.dev
+pixi auth login prefix.dev --token pfx_jj8WDzvnuTHEGdAhwRZMC1Ag8gSto8
+```
+
+```bash anaconda.org
+pixi auth login anaconda.org --conda-token xy-72b914cc-c105-4ec7-a969-ab21d23480ed
+```
+
+```bash Basic HTTP
+pixi auth login myserver.com --username user --password password
+```
+
+```bash S3 Bucket
+pixi auth login s3://my-bucket \
+  --s3-access-key-id <access-key-id> \
+  --s3-secret-access-key <secret-access-key>
+
+# With session token
+pixi auth login s3://my-bucket \
+  --s3-access-key-id <access-key-id> \
+  --s3-secret-access-key <secret-access-key> \
+  --s3-session-token <session-token>
+```
+</CodeGroup>
+
+<Note>
+S3 authentication also supports AWS's standard `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables. See the [S3 section](/deployment/s3) for details.
+</Note>
+
+### Authentication Types Explained
+
+#### Bearer Token
+
+Standard token authentication used by prefix.dev. The token is sent with every request in the `Authorization` header:
+
+```
+Authorization: Bearer <TOKEN>
+```
+
+#### Conda Token
+
+Used by anaconda.org and Quetz servers. The token is encoded in the URL:
+
+```
+https://conda.anaconda.org/t/<TOKEN>/conda-forge/linux-64/...
+```
+
+#### Basic HTTP Authentication
+
+Username and password authentication, commonly used with self-hosted servers:
+
+```
+http://user:password@myserver.com/...
+```
+
+Easily configured with reverse proxies like Nginx or Apache.
+
+## Credential Storage
+
+### Platform-Specific Storage
+
+Pixi stores credentials securely using your system's keychain:
+
+<CodeGroup>
+```text Windows
+Location: Credentials Manager
+Search for: "rattler"
+Access: Windows Credentials Manager app
+```
+
+```text macOS
+Location: Keychain
+Search for: "rattler"
+Access: Keychain Access app
+```
+
+```text Linux
+Location: GNOME Keyring / libsecret
+Search for: "rattler"
+Access: Seahorse (GNOME Keyring app)
+```
+</CodeGroup>
+
+### Fallback Storage
+
+On servers without keychain support, Pixi stores credentials in an insecure JSON file:
+
+```
+~/.rattler/credentials.json
+```
+
+<Warning>
+This fallback storage is unencrypted. Use environment-based authentication in production environments.
+</Warning>
+
+### Override Authentication Storage
+
+Use the `RATTLER_AUTH_FILE` environment variable to specify a custom credentials file:
+
+```bash
+export RATTLER_AUTH_FILE=$HOME/credentials.json
+pixi install
+
+# Or specify per-command
+pixi global install --auth-file $HOME/credentials.json package-name
+```
+
+<Note>
+`RATTLER_AUTH_FILE` takes precedence over the CLI `--auth-file` argument.
+</Note>
+
+### Credentials File Format
+
+The JSON file should follow this format:
+
+```json credentials.json
+{
+  "*.prefix.dev": {
+    "BearerToken": "your_token"
+  },
+  "otherhost.com": {
+    "BasicHTTP": {
+      "username": "your_username",
+      "password": "your_password"
+    }
+  },
+  "conda.anaconda.org": {
+    "CondaToken": "your_token"
+  },
+  "s3://my-bucket": {
+    "S3Credentials": {
+      "access_key_id": "my-access-key-id",
+      "secret_access_key": "my-secret-access-key",
+      "session_token": null
+    }
+  }
+}
+```
+
+Wildcard hosts (e.g., `*.prefix.dev`) match any subdomain like `repo.prefix.dev`.
+
+You can also configure the authentication file in the [global configuration file](/reference/configuration).
+
+## PyPI Authentication
+
+Pixi supports two methods for PyPI authentication:
+
+1. Keyring authentication
+2. `.netrc` file authentication
+
+### Keyring Authentication
+
+Pixi uses the Python [keyring](https://pypi.org/project/keyring/) library for PyPI authentication.
+
+<Steps>
+  <Step title="Install Keyring">
+    Install keyring globally based on your registry type:
+    
+    <CodeGroup>
+    ```bash Basic Auth
+    pixi global install keyring
+    ```
+    
+    ```bash Google Artifact Registry
+    pixi global install keyring --with keyrings.google-artifactregistry-auth
+    ```
+    
+    ```bash Azure DevOps Artifacts
+    pixi global install keyring --with keyrings.artifacts
+    ```
+    
+    ```bash AWS CodeArtifact
+    pixi global install keyring --with keyrings.codeartifact
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Configure Credentials">
+    Store credentials and configure your workspace:
+    
+    <CodeGroup>
+    ```bash Basic Auth
+    # Store credentials
+    keyring set https://my-index/simple your_username
+    # Password prompt will appear
+    
+    # Configure pixi.toml
+    # Add your_username@ to the registry URL
+    ```
+    
+    ```toml Basic Auth - pixi.toml
+    [pypi-options]
+    index-url = "https://your_username@custom-registry.com/simple"
+    ```
+    
+    ```bash Google Artifact Registry
+    # Ensure you're logged in
+    gcloud auth login
+    
+    # Find the URL
+    gcloud artifacts print-settings python \
+      --project=<project> \
+      --repository=<repository> \
+      --location=<location>
+    ```
+    
+    ```toml Google Artifact Registry - pixi.toml
+    [pypi-options]
+    extra-index-urls = [
+      "https://oauth2accesstoken@<location>-python.pkg.dev/<project>/<repository>/simple"
+    ]
+    ```
+    
+    ```toml Azure DevOps Artifacts - pixi.toml
+    [pypi-options]
+    extra-index-urls = [
+      "https://VssSessionToken@pkgs.dev.azure.com/{organization}/{project}/_packaging/{feed}/pypi/simple/"
+    ]
+    ```
+    
+    ```bash AWS CodeArtifact
+    # Ensure you're logged in
+    aws sso login
+    ```
+    
+    ```toml AWS CodeArtifact - pixi.toml
+    [pypi-options]
+    extra-index-urls = [
+      "https://aws@<your-domain>-<your-account>.d.codeartifact.<your-region>.amazonaws.com/pypi/<your-repository>/simple/"
+    ]
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Install with Keyring">
+    Enable keyring provider when installing:
+    
+    ```bash
+    pixi install --pypi-keyring-provider subprocess
+    ```
+    
+    Or configure globally in your [Global Config](/reference/configuration#pypi-config):
+    
+    ```toml
+    [pypi-config]
+    keyring-provider = "subprocess"
+    ```
+  </Step>
+</Steps>
+
+### .netrc File Authentication
+
+Store PyPI credentials in a `.netrc` file:
+
+<Steps>
+  <Step title="Create .netrc file">
+    Create the file in your home directory:
+    
+    <CodeGroup>
+    ```text Unix/Linux/macOS
+    Location: $HOME/.netrc
+    ```
+    
+    ```text Windows
+    Location: %HOME%\_netrc
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Add credentials">
+    ```text .netrc
+    machine registry-name
+    login admin
+    password admin
+    ```
+  </Step>
+  
+  <Step title="Use custom location (optional)">
+    Set the `NETRC` environment variable:
+    
+    ```bash
+    export NETRC=/my/custom/location/.netrc
+    pixi install
+    ```
+  </Step>
+</Steps>
+
+For more details, see the [.netrc file format documentation](https://www.ibm.com/docs/en/aix/7.2?topic=formats-netrc-file-format-tcpip).
+
+## Best Practices
+
+<Card title="Use Secrets Management" icon="lock">
+Never commit credentials to version control. Use environment variables or CI/CD secrets.
+</Card>
+
+<Card title="Rotate Credentials" icon="rotate">
+Regularly rotate authentication tokens and passwords for better security.
+</Card>
+
+<Card title="Minimal Permissions" icon="shield-check">
+Use tokens with minimal required permissions for each use case.
+</Card>
+
+<Card title="Environment-Specific Auth" icon="layer-group">
+Use different credentials for development, staging, and production environments.
+</Card>

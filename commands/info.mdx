@@ -1,0 +1,294 @@
+---
+title: pixi info
+---
+
+Display information about the system, workspace, and environments.
+
+## Usage
+
+```bash
+pixi info [OPTIONS]
+```
+
+## Description
+
+The `pixi info` command provides comprehensive information about:
+- **System** information (platform, virtual packages, cache directories)
+- **Global** pixi configuration (bin directory, environment directory)
+- **Workspace** information (name, version, manifest path)
+- **Environment** details (features, dependencies, platforms, tasks)
+
+## Options
+
+<ParamField path="--extended" type="boolean">
+  Show cache and environment sizes. This may take some time to calculate.
+  
+  ```bash
+  pixi info --extended
+  ```
+</ParamField>
+
+<ParamField path="--json" type="boolean">
+  Output in JSON format for programmatic access.
+  
+  ```bash
+  pixi info --json
+  ```
+</ParamField>
+
+## Examples
+
+### Basic system information
+
+Show system and workspace information:
+
+```bash
+pixi info
+```
+
+Example output:
+```
+System
+------------
+Pixi version        : 0.42.0
+TLS backend         : native-tls
+Platform            : linux-64
+Virtual packages    : __unix=0=0
+                    : __linux=5.15.0=0
+                    : __glibc=2.35=0
+Cache dir           : /home/user/.cache/rattler
+Auth storage        : /home/user/.rattler/credentials.json
+Config locations    : /home/user/.config/pixi/config.toml
+
+Workspace
+------------
+Name                : my-project
+Version             : 0.1.0
+Manifest file       : /home/user/my-project/pixi.toml
+Last updated        : 15-01-2024 14:23:45
+
+Environments
+------------
+Environment         : default
+Features            : default
+Dependency count    : 5
+Dependencies        : python, numpy, pandas, pytest, black
+Target platforms    : linux-64, osx-64, win-64
+Prefix location     : /home/user/my-project/.pixi/envs/default
+Tasks               : test, lint, format
+```
+
+### Extended information with sizes
+
+Show detailed information including directory sizes:
+
+```bash
+pixi info --extended
+```
+
+Additional output:
+```
+Cache size          : 2.5 GiB
+Environment size    : 450 MiB
+```
+
+### JSON output
+
+Get structured output for automation:
+
+```bash
+pixi info --json
+```
+
+Example JSON output:
+```json
+{
+  "platform": "linux-64",
+  "virtual_packages": [
+    "__unix=0=0",
+    "__linux=5.15.0=0",
+    "__glibc=2.35=0"
+  ],
+  "version": "0.42.0",
+  "tls_backend": "native-tls",
+  "cache_dir": "/home/user/.cache/rattler",
+  "cache_size": null,
+  "auth_dir": "/home/user/.rattler/credentials.json",
+  "project_info": {
+    "name": "my-project",
+    "manifest_path": "/home/user/my-project/pixi.toml",
+    "last_updated": "15-01-2024 14:23:45",
+    "pixi_folder_size": null,
+    "version": "0.1.0"
+  },
+  "environments_info": [
+    {
+      "name": "default",
+      "features": ["default"],
+      "solve_group": null,
+      "environment_size": null,
+      "dependencies": ["python", "numpy", "pandas"],
+      "pypi_dependencies": ["requests", "pytest"],
+      "platforms": ["linux-64", "osx-64"],
+      "tasks": ["test", "lint"],
+      "channels": ["conda-forge"],
+      "prefix": "/home/user/my-project/.pixi/envs/default",
+      "system_requirements": {}
+    }
+  ]
+}
+```
+
+## Information Sections
+
+### System
+
+<ResponseField name="Pixi version" type="string">
+  The version of pixi currently installed.
+</ResponseField>
+
+<ResponseField name="TLS backend" type="string">
+  The TLS implementation being used (native-tls or rustls).
+</ResponseField>
+
+<ResponseField name="Platform" type="string">
+  The current platform (e.g., linux-64, osx-arm64, win-64).
+</ResponseField>
+
+<ResponseField name="Virtual packages" type="array">
+  System virtual packages detected (e.g., __unix, __linux, __glibc, __osx, __cuda).
+</ResponseField>
+
+<ResponseField name="Cache dir" type="path">
+  Location of the rattler cache directory.
+</ResponseField>
+
+<ResponseField name="Cache size" type="string">
+  Size of the cache directory (only with `--extended`).
+</ResponseField>
+
+<ResponseField name="Auth storage" type="path">
+  Location of authentication credentials.
+</ResponseField>
+
+<ResponseField name="Config locations" type="array">
+  Paths to configuration files being used.
+</ResponseField>
+
+### Global
+
+<ResponseField name="Bin dir" type="path">
+  Directory where globally installed binaries are stored.
+</ResponseField>
+
+<ResponseField name="Environment dir" type="path">
+  Directory where global environments are stored.
+</ResponseField>
+
+<ResponseField name="Manifest dir" type="path">
+  Location of the global manifest file.
+</ResponseField>
+
+### Workspace
+
+<ResponseField name="Name" type="string">
+  The workspace name from the manifest.
+</ResponseField>
+
+<ResponseField name="Version" type="string">
+  The workspace version.
+</ResponseField>
+
+<ResponseField name="Manifest file" type="path">
+  Path to the pixi.toml or pyproject.toml.
+</ResponseField>
+
+<ResponseField name="Last updated" type="string">
+  Last modification time of the lock file.
+</ResponseField>
+
+### Environments
+
+<ResponseField name="Environment" type="string">
+  Name of the environment.
+</ResponseField>
+
+<ResponseField name="Features" type="array">
+  Features included in this environment.
+</ResponseField>
+
+<ResponseField name="Solve group" type="string">
+  The solve group this environment belongs to (if any).
+</ResponseField>
+
+<ResponseField name="Environment size" type="string">
+  Size of the environment directory (only with `--extended`).
+</ResponseField>
+
+<ResponseField name="Dependency count" type="integer">
+  Number of dependencies in the environment.
+</ResponseField>
+
+<ResponseField name="Dependencies" type="array">
+  List of conda dependencies.
+</ResponseField>
+
+<ResponseField name="PyPI Dependencies" type="array">
+  List of PyPI dependencies.
+</ResponseField>
+
+<ResponseField name="Target platforms" type="array">
+  Platforms this environment supports.
+</ResponseField>
+
+<ResponseField name="Prefix location" type="path">
+  Full path to the environment directory.
+</ResponseField>
+
+<ResponseField name="System requirements" type="object">
+  System requirements specified for the environment.
+</ResponseField>
+
+<ResponseField name="Tasks" type="array">
+  Available tasks in this environment.
+</ResponseField>
+
+## Use Cases
+
+### Debugging environment issues
+
+Check environment configuration:
+
+```bash
+pixi info
+```
+
+### Checking cache usage
+
+See how much disk space is used:
+
+```bash
+pixi info --extended
+```
+
+### CI/CD integration
+
+Extract information programmatically:
+
+```bash
+pixi info --json | jq '.version'
+```
+
+### Reporting bugs
+
+Include system information when reporting issues:
+
+```bash
+pixi info > pixi-info.txt
+```
+
+## Related Commands
+
+- [`pixi list`](/commands/list) - List installed packages
+- [`pixi search`](/commands/search) - Search for packages
+- [`pixi clean`](/commands/clean) - Clean cache and environments

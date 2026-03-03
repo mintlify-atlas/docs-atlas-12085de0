@@ -1,0 +1,429 @@
+---
+title: Python Development with Pixi
+description: Learn how to set up and manage Python projects with Pixi, combining conda and PyPI packages seamlessly.
+---
+
+Learn how to create Python projects with Pixi, manage dependencies from both conda and PyPI, and leverage the power of reproducible environments.
+
+## Why Use Pixi for Python Development?
+
+Pixi builds upon the conda ecosystem, which allows you to create Python environments with all the dependencies you need. This is especially useful when working with:
+
+- Multiple Python interpreters
+- Bindings to C and C++ libraries
+- Packages that require system-level dependencies
+- Mixed conda and PyPI packages
+
+For example, GDAL from PyPI doesn't include binary C dependencies, but the conda package does. On the other hand, some packages are only available through PyPI. Pixi gives you the best of both worlds.
+
+## Getting Started
+
+<Steps>
+
+### Initialize a Python Project
+
+Create a new Python project using the `pyproject.toml` format:
+
+```bash
+pixi init my-python-project --format pyproject
+cd my-python-project
+```
+
+This creates a project with the following structure:
+
+```
+my-python-project/
+├── pyproject.toml
+└── src/
+    └── my_python_project/
+        └── __init__.py
+```
+
+### Understand the Project Structure
+
+The generated `pyproject.toml` includes:
+
+```toml
+[project]
+name = "my-python-project"
+requires-python = ">= 3.11"
+version = "0.1.0"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+[tool.pixi.pypi-dependencies]
+my-python-project = { path = ".", editable = true }
+```
+
+<Note>
+The project is installed as an editable dependency, so changes to your code are immediately reflected without reinstalling.
+</Note>
+
+### Add Dependencies
+
+Pixi makes it easy to add both conda and PyPI dependencies:
+
+<Tabs>
+<Tab title="Conda Packages">
+
+Add conda packages using `pixi add`:
+
+```bash
+pixi add numpy pandas matplotlib
+```
+
+This adds packages to the `[tool.pixi.dependencies]` section:
+
+```toml
+[tool.pixi.dependencies]
+numpy = ">=2.0.0,<3"
+pandas = ">=2.2.0,<3"
+matplotlib = ">=3.8.0,<4"
+```
+
+</Tab>
+<Tab title="PyPI Packages">
+
+Add PyPI packages using the `--pypi` flag:
+
+```bash
+pixi add --pypi requests httpx
+```
+
+This adds packages to the `[project]` dependencies:
+
+```toml
+[project]
+dependencies = ["requests", "httpx"]
+```
+
+</Tab>
+<Tab title="With Extras">
+
+Install packages with optional extras:
+
+```bash
+pixi add --pypi "flask[async]==3.1.0"
+```
+
+Result:
+
+```toml
+[project]
+dependencies = ["flask[async]==3.1.0"]
+```
+
+</Tab>
+</Tabs>
+
+</Steps>
+
+## Working with Your Project
+
+### Write Python Code
+
+Add a function to `src/my_python_project/__init__.py`:
+
+```python
+from rich import print
+
+def hello():
+    return "Hello, [bold magenta]World[/bold magenta]!", ":vampire:"
+
+def say_hello():
+    print(*hello())
+```
+
+First, add the `rich` dependency:
+
+```bash
+pixi add --pypi rich
+```
+
+### Run Your Code
+
+Run your Python code using `pixi run`:
+
+```bash
+pixi run python -c 'import my_python_project; my_python_project.say_hello()'
+```
+
+**Expected Output:**
+
+```
+Hello, World! 🧛
+```
+
+<Tip>
+The first run might be slow as Pixi installs dependencies, but subsequent runs will be nearly instant.
+</Tip>
+
+### Install the Environment
+
+While Pixi automatically installs dependencies when running commands, you can manually install:
+
+```bash
+pixi install
+```
+
+This creates a `.pixi` directory containing your isolated environment:
+
+```
+.pixi/
+└── envs/
+    └── default/
+```
+
+## Managing Environments
+
+### View Installed Packages
+
+List all packages in your environment:
+
+```bash
+pixi list
+```
+
+**Example Output:**
+
+```
+Package          Version     Build               Size       Kind   Source
+my-python-project 0.1.0                                     pypi   (editable)
+numpy            2.2.1       py313ha4a2180_0     6.2 MiB    conda  numpy
+pandas           2.2.0       py313h1f23e1c_0     12.1 MiB   conda  pandas
+python           3.13.1      h4f43103_105_cp313  12.3 MiB   conda  python
+rich             13.7.0                          789 KiB    pypi   rich-13.7.0-py3-none-any.whl
+```
+
+To see only explicitly installed packages:
+
+```bash
+pixi list --explicit
+```
+
+### Check Dependency Tree
+
+See why a package is installed:
+
+```bash
+pixi tree pygments
+```
+
+Or see what depends on a package:
+
+```bash
+pixi tree --invert pygments
+```
+
+## Mixing Conda and PyPI Packages
+
+One of Pixi's powerful features is seamlessly mixing conda and PyPI packages. PyPI packages can depend on conda packages, and Pixi will resolve everything correctly.
+
+### Replace PyPI with Conda
+
+If a dependency is installed from PyPI, you can replace it with a conda version:
+
+```bash
+# Check current source
+pixi list pygments
+# Output: pygments  2.17.2  pypi
+
+# Add as conda package
+pixi add pygments
+
+# Verify it's now from conda
+pixi list pygments
+# Output: pygments  2.19.1  conda
+```
+
+Your code continues to work without any changes!
+
+## Working with Tasks
+
+### Create Development Tasks
+
+Define custom tasks in your `pyproject.toml`:
+
+```toml
+[tool.pixi.tasks]
+start = "python -m my_python_project"
+lint = "ruff check ."
+format = "ruff format ."
+```
+
+Run tasks with:
+
+```bash
+pixi run start
+pixi run lint
+pixi run format
+```
+
+## Python Version Management
+
+### Specify Python Version
+
+The `requires-python` field automatically manages the Python interpreter:
+
+```toml
+[project]
+requires-python = ">=3.11,<3.14"
+```
+
+Pixi automatically installs the appropriate Python version - no more `brew`, `apt`, or system installation steps!
+
+### Use Free-threaded Python
+
+For free-threaded Python (PEP 703), add:
+
+```bash
+pixi add python-freethreading
+```
+
+<Note>
+Free-threaded Python is experimental and may not work with all packages yet.
+</Note>
+
+## Testing Your Code
+
+Create a test file at `tests/test_my_project.py`:
+
+```python
+from my_python_project import hello
+
+def test_hello():
+    result = hello()
+    assert result == ("Hello, [bold magenta]World[/bold magenta]!", ":vampire:")
+```
+
+Add pytest and create a test environment:
+
+```bash
+pixi add --pypi --feature test pytest
+pixi task add --feature test test "pytest"
+pixi workspace environment add test --feature test
+```
+
+Run tests:
+
+```bash
+pixi run test
+```
+
+**Expected Output:**
+
+```
+✨ Pixi task (test): pytest
+======================== test session starts =========================
+platform linux -- Python 3.13.1, pytest-8.3.4, pluggy-1.5.0
+rootdir: /path/to/my-python-project
+collected 1 item
+
+tests/test_my_project.py .                                     [100%]
+
+========================= 1 passed in 0.02s ==========================
+```
+
+## Complete Example
+
+Here's a complete `pyproject.toml` for a data science project:
+
+```toml
+[project]
+name = "data-analysis"
+requires-python = ">=3.11"
+version = "0.1.0"
+dependencies = [
+    "jupyter",
+    "ipykernel",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+[tool.pixi.dependencies]
+numpy = ">=2.0.0,<3"
+pandas = ">=2.2.0,<3"
+matplotlib = ">=3.8.0,<4"
+scikit-learn = ">=1.4.0,<2"
+
+[tool.pixi.pypi-dependencies]
+data-analysis = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+notebook = "jupyter notebook"
+lab = "jupyter lab"
+clean = "find . -type d -name __pycache__ -exec rm -rf {} +"
+
+[tool.pixi.feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+
+[tool.pixi.feature.test.tasks]
+test = "pytest tests/"
+coverage = "pytest --cov=data_analysis tests/"
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
+```
+
+## Best Practices
+
+<Tip>
+**Use the right package source:**
+- Use conda for packages with system dependencies (numpy, scipy, opencv)
+- Use PyPI for pure Python packages
+- Pixi can mix both seamlessly
+</Tip>
+
+<Tip>
+**Leverage editable installs:**
+The editable install means you can modify your code and immediately see changes without reinstalling.
+</Tip>
+
+<Tip>
+**Create multiple environments:**
+Separate development, testing, and production dependencies using features and environments.
+</Tip>
+
+## Next Steps
+
+- Learn about [using pyproject.toml](/tutorials/pyproject-toml) in depth
+- Set up [multiple environments](/tutorials/multi-environment) for different use cases
+- Explore [global tools](/tutorials/global-tools) for system-wide installations
+
+## Troubleshooting
+
+### Slow Installation
+
+The first installation downloads and installs all dependencies. Subsequent installations are much faster due to caching.
+
+### Package Conflicts
+
+If you encounter conflicts between conda and PyPI packages, try:
+
+1. Prefer conda packages when available
+2. Use solve groups to ensure consistency
+3. Check `pixi list` to see which source each package comes from
+
+### Python Version Issues
+
+Ensure your `requires-python` field matches your dependencies' requirements:
+
+```toml
+[project]
+requires-python = ">=3.11,<3.14"
+```

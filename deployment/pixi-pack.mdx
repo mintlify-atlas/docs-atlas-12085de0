@@ -1,0 +1,280 @@
+---
+title: 'Pixi-Pack'
+description: 'Package and distribute Pixi environments as portable archives'
+---
+
+`pixi-pack` is a tool that packages Pixi environments into compressed archives that can be shipped to target machines. The corresponding `pixi-unpack` tool recreates the environment without requiring Pixi, conda, or micromamba.
+
+## Installation
+
+<Steps>
+  <Step title="Install globally">
+    Install both tools using Pixi's global installation:
+    
+    ```bash
+    pixi global install pixi-pack pixi-unpack
+    ```
+    
+    Or download pre-built binaries from the [releases page](https://github.com/Quantco/pixi-pack/releases).
+  </Step>
+  
+  <Step title="Use with pixi exec">
+    Alternatively, run without installation:
+    
+    ```bash
+    pixi exec pixi-pack
+    pixi exec pixi-unpack environment.tar
+    ```
+  </Step>
+</Steps>
+
+<Note>
+If you have `pixi`, `pixi-pack`, and `pixi-unpack` installed globally, you can also use the shorter commands `pixi pack` and `pixi unpack`.
+</Note>
+
+## Creating a Pack
+
+Package an environment for distribution:
+
+```bash
+pixi-pack --environment prod --platform linux-64 pixi.toml
+```
+
+This creates an `environment.tar` file containing all conda packages required for the environment:
+
+```plain
+environment.tar
+├── pixi-pack.json
+├── environment.yml
+└── channel
+    ├── noarch
+    │   ├── tzdata-2024a-h0c530f3_0.conda
+    │   ├── ...
+    │   └── repodata.json
+    └── linux-64
+        ├── ca-certificates-2024.2.2-hbcca054_0.conda
+        ├── ...
+        └── repodata.json
+```
+
+## Unpacking an Environment
+
+Extract and recreate the environment on the target system:
+
+```bash
+pixi-unpack environment.tar
+```
+
+This creates:
+- `./env/` - The conda environment
+- `activate.sh` (or `activate.bat` on Windows) - Activation script
+
+<CodeGroup>
+```bash Bash/Zsh
+$ pixi-unpack environment.tar
+$ ls
+env/
+activate.sh
+environment.tar
+
+$ cat activate.sh
+export PATH="/home/user/project/env/bin:..."
+export CONDA_PREFIX="/home/user/project/env"
+. "/home/user/project/env/etc/conda/activate.d/activate_custom_package.sh"
+```
+
+```powershell PowerShell
+PS> pixi-unpack environment.tar
+PS> ls
+env/
+activate.bat
+environment.tar
+```
+</CodeGroup>
+
+## Cross-Platform Packs
+
+Create packs for different platforms without running on that platform:
+
+```bash
+pixi-pack --platform win-64
+pixi-pack --platform osx-arm64
+pixi-pack --platform linux-64
+```
+
+<Warning>
+You can only unpack a pack on a system with the same platform it was created for.
+</Warning>
+
+## Self-Extracting Binaries
+
+Create standalone executables that unpack without requiring `pixi-unpack`:
+
+<CodeGroup>
+```bash Linux/macOS
+$ pixi-pack --create-executable
+$ ls
+environment.sh
+
+$ ./environment.sh
+$ ls
+env/
+activate.sh
+environment.sh
+```
+
+```powershell Windows
+PS> pixi-pack --create-executable
+PS> ls
+environment.ps1
+
+PS> .\environment.ps1
+PS> ls
+env/
+activate.bat
+environment.ps1
+```
+</CodeGroup>
+
+### Custom pixi-unpack Source
+
+Specify a custom location for the `pixi-unpack` executable:
+
+<CodeGroup>
+```bash URL
+pixi-pack --create-executable \
+  --pixi-unpack-source https://my.mirror/pixi-pack/pixi-unpack-x86_64-unknown-linux-musl
+```
+
+```bash Local Path
+pixi-pack --create-executable \
+  --pixi-unpack-source ./pixi-unpack-x86_64-unknown-linux-musl
+```
+</CodeGroup>
+
+<Note>
+The produced executable is a shell script containing both the `pixi-unpack` binary and the packed environment.
+</Note>
+
+## Advanced Features
+
+### Inject Additional Packages
+
+Add packages not specified in `pixi.lock`:
+
+```bash
+pixi-pack --inject local-package-1.0.0-hbefa133_0.conda pixi.toml
+```
+
+This is useful for including locally built packages while using the workspace's lockfile.
+
+### PyPI Support
+
+Pack PyPI wheel packages into your environment:
+
+```bash
+pixi-pack --ignore-pypi-non-wheel --inject my_webserver-0.1.0-py3-none-any.whl
+```
+
+<Warning>
+- Only wheel packages are supported (not source distributions)
+- Use `--ignore-pypi-non-wheel` to skip source distributions
+- Pixi-pack cannot verify wheel compatibility with the target environment
+</Warning>
+
+### Mirror and S3 Configuration
+
+Use custom mirrors or S3 buckets:
+
+```toml config.toml
+[mirrors]
+"https://conda.anaconda.org/conda-forge" = ["https://my.artifactory/conda-forge"]
+
+[s3-options.my-s3-bucket]
+endpoint-url = "https://s3.eu-central-1.amazonaws.com"
+region = "eu-central-1"
+force-path-style = false
+```
+
+```bash
+pixi-pack --config config.toml
+```
+
+See the [S3 documentation](/deployment/s3) for more details.
+
+### Concurrency Control
+
+Limit parallel downloads:
+
+```toml config.toml
+[concurrency]
+downloads = 5
+```
+
+### Package Caching
+
+Cache downloaded packages for faster subsequent operations:
+
+```bash
+pixi-pack --use-cache ~/.pixi-pack/cache
+```
+
+Benefits:
+- Reuse packages across multiple packs
+- Reduce bandwidth usage
+- Speed up CI/CD pipelines
+- Handle large packages efficiently
+
+The cache follows the conda channel structure, organizing packages by platform subdirectories.
+
+## Unpacking Without pixi-pack
+
+If `pixi-pack` is unavailable on the target system, use `conda` or `micromamba`:
+
+<Steps>
+  <Step title="Extract the archive">
+    ```bash
+    tar -xvf environment.tar
+    ```
+  </Step>
+  
+  <Step title="Create the environment">
+    <CodeGroup>
+    ```bash Micromamba
+    micromamba create -p ./env --file environment.yml
+    ```
+    
+    ```bash Conda
+    conda env create -p ./env --file environment.yml
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+<Note>
+The `environment.yml` and `repodata.json` files are only for this compatibility mode. `pixi-unpack` does not use them.
+</Note>
+
+<Warning>
+Both `conda` and `mamba` automatically install `pip` alongside Python, which differs from Pixi's behavior. This can cause solver errors. Fix by either:
+- Adding `pip` to your `pixi.lock`: `pixi add pip`
+- Disabling pip auto-install: `conda config --set add_pip_as_python_dependency false`
+</Warning>
+
+## Use Cases
+
+<Card title="Production Deployment" icon="rocket">
+Package development environments for production deployment without internet access on target servers.
+</Card>
+
+<Card title="Air-Gapped Systems" icon="shield">
+Distribute software to air-gapped or restricted network environments.
+</Card>
+
+<Card title="Reproducibility" icon="rotate">
+Ensure exact dependency versions across different machines and time periods.
+</Card>
+
+<Card title="CI/CD Optimization" icon="bolt">
+Cache and reuse packages across pipeline runs to reduce build times.
+</Card>

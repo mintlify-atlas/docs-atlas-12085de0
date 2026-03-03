@@ -1,0 +1,532 @@
+---
+title: Multi-Package Workspaces
+description: Develop multiple interdependent packages in a single Pixi workspace
+---
+
+Learn how to manage multiple packages within a single workspace, enabling local development of interdependent libraries.
+
+<Warning>
+`pixi-build` is a preview feature and will change until stabilized. Keep this in mind when using it for your projects.
+</Warning>
+
+## Why Use Workspaces?
+
+Workspaces solve several development challenges:
+
+- **Local development** - Work on multiple packages simultaneously
+- **Source dependencies** - Depend on unreleased versions
+- **Monorepo support** - Manage related packages in one repository
+- **Cross-language projects** - Mix Python, C++, Rust, and more
+- **Shared configuration** - Common channels, platforms, and settings
+
+<Note>
+Normally, conda packages come pre-built from channels. Workspaces let you depend on the source code directly, which is built automatically as needed.
+</Note>
+
+## Creating a Multi-Package Workspace
+
+<Steps>
+
+### Understand the Structure
+
+A workspace combines multiple packages:
+
+```text
+workspace/
+├── pixi.toml              # Workspace + python_rich package
+├── pyproject.toml         # Python package metadata
+├── src/
+│   └── python_rich/
+│       └── __init__.py
+└── packages/
+    └── cpp_math/          # C++ package
+        ├── pixi.toml
+        ├── CMakeLists.txt
+        └── src/
+            └── math.cpp
+```
+
+### Configure the Root Workspace
+
+The root `pixi.toml` manages workspace-level settings:
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["win-64", "linux-64", "osx-arm64", "osx-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+python_rich = { path = "." }
+
+[tasks]
+start = "rich-example-main"
+
+[package]
+name = "python_rich"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+
+[package.host-dependencies]
+hatchling = "==1.26.3"
+
+[package.run-dependencies]
+cpp_math = { path = "packages/cpp_math" }  # (1)!
+rich = "13.9.*"
+```
+
+1. Add the C++ package as a run dependency with a path
+
+<Note>
+The root manifest contains both:
+- **Workspace configuration** - Shared across all packages
+- **Package definition** - For the `python_rich` package
+</Note>
+
+### Configure the Sub-Package
+
+The C++ package only needs package configuration:
+
+```toml title="packages/cpp_math/pixi.toml"
+[package]
+name = "cpp_math"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-cmake", version = "0.3.*" }
+
+[package.host-dependencies]
+cmake = "3.20.*"
+nanobind = "2.4.*"
+python = "3.12.*"
+```
+
+<Note>
+Sub-packages inherit workspace settings from the root, so you don't need to repeat channels, platforms, or preview settings.
+</Note>
+
+### Use Dependencies Across Packages
+
+Now the Python package can use the C++ package:
+
+```python title="src/python_rich/__init__.py"
+from dataclasses import dataclass, fields
+from rich.console import Console
+from rich.table import Table
+import cpp_math  # (1)!
+
+
+@dataclass
+class Person:
+    name: str
+    age: int
+    city: str
+
+
+def main() -> None:
+    console = Console()
+
+    people = [
+        Person("John Doe", 30, "New York"),
+        Person("Jane Smith", 25, "Los Angeles"),
+        Person("Tim de Jager", 35, "Utrecht"),
+    ]
+
+    table = Table()
+
+    for column in fields(Person):
+        table.add_column(column.name)
+
+    for person in people:
+        updated_age = cpp_math.add(person.age, 1)  # (2)!
+        table.add_row(person.name, str(updated_age), person.city)
+
+    console.print(table)
+```
+
+1. Import the C++ package
+2. Use the C++ `add` function to increment ages
+
+### Build and Run
+
+Run the workspace:
+
+```bash
+pixi run start
+```
+
+Output:
+```text
+┏━━━━━━━━━━━━━━┳━━━━━┳━━━━━━━━━━━━━┓
+┃ name         ┃ age ┃ city        ┃
+┡━━━━━━━━━━━━━━╇━━━━━╇━━━━━━━━━━━━━┩
+│ John Doe     │ 31  │ New York    │
+│ Jane Smith   │ 26  │ Los Angeles │
+│ Tim de Jager │ 36  │ Utrecht     │
+└──────────────┴─────┴─────────────┘
+```
+
+</Steps>
+
+## Workspace Patterns
+
+### Python-Only Workspace
+
+Multiple Python packages:
+
+```toml title="pixi.toml"
+[workspace]
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+name = "recursive-run-deps"
+platforms = ["win-64", "osx-arm64", "linux-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+root = { path = "src/root" }
+
+[tasks]
+start = "python -c 'import root'"
+test = [{ task = "start" }]
+```
+
+With sub-packages:
+
+```toml title="src/root/pyproject.toml"
+[project]
+name = "root"
+version = "0.1.0"
+dependencies = ["depend"]
+requires-python = ">= 3.11"
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.pixi.package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+
+[tool.pixi.package.host-dependencies]
+hatchling = ">=1.27,<2.0"
+
+[tool.pixi.package.run-dependencies]
+depend = { path = "../depend" }  # (1)!
+```
+
+1. Depend on another package in the workspace
+
+```toml title="src/depend/pyproject.toml"
+[project]
+name = "depend"
+version = "0.1.0"
+requires-python = ">= 3.11"
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.pixi.package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+
+[tool.pixi.package.host-dependencies]
+hatchling = ">=1.27,<2.0"
+
+[tool.pixi.package.run-dependencies]
+boltons = "*"  # (2)!
+```
+
+2. External conda dependencies
+
+### Workspace with Dev Dependencies
+
+Use `[dev]` instead of `[dependencies]` to install only build-time dependencies:
+
+```toml title="pixi.toml"
+[workspace]
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+preview = ["pixi-build"]
+
+[tasks]
+start = "cmake --version && python -VV && bat --version"
+test = [{ task = "start" }]
+
+[dev]  # (1)!
+minimal-example = { path = "." }
+
+[package]
+name = "minimal-example"
+version = "0.1.0"
+
+[package.build.backend]
+name = "pixi-build-cmake"
+version = "0.3.*"
+
+[package.build-dependencies]
+cmake = ">=3.27.8,<4.0"
+
+[package.host-dependencies]
+python = ">=3.12.4,<4"
+sdl2 = ">=2.26.5,<3.0"
+
+[package.run-dependencies]
+bat = "*"
+```
+
+1. `[dev]` installs build and host dependencies but not the package itself
+
+<Accordion title="When to use [dev] vs [dependencies]?">
+**Use `[dependencies]`** when:
+- You want the built package installed in the environment
+- You're creating a library for others to use
+- You need to test the installed package
+
+**Use `[dev]`** when:
+- You only need build-time dependencies
+- You're developing the package and don't need it installed
+- You want faster iteration without package installation
+</Accordion>
+
+## Complete Workspace Example
+
+Here's the C++ package configuration:
+
+```cmake title="packages/cpp_math/CMakeLists.txt"
+cmake_minimum_required(VERSION 3.20...3.27)
+project(cpp_math)
+
+find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
+
+execute_process(
+  COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT
+)
+
+execute_process(
+    COMMAND ${Python_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_path('purelib'))"
+    OUTPUT_VARIABLE PYTHON_SITE_PACKAGES
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+find_package(nanobind CONFIG REQUIRED)
+
+nanobind_add_module(${PROJECT_NAME} src/math.cpp)
+
+install(
+    TARGETS ${PROJECT_NAME}
+    EXPORT ${PROJECT_NAME}Targets
+    LIBRARY DESTINATION ${PYTHON_SITE_PACKAGES}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${BINDIR}
+)
+```
+
+```cpp title="packages/cpp_math/src/math.cpp"
+#include <nanobind/nanobind.h>
+
+int add(int a, int b) { return a + b; }
+
+NB_MODULE(cpp_math, m)
+{
+    m.def("add", &add);
+}
+```
+
+## Workspace Commands
+
+<CodeGroup>
+
+```bash Install All Packages
+pixi install
+```
+
+```bash Build Specific Package
+pixi build packages/cpp_math
+```
+
+```bash Run Task
+pixi run start
+```
+
+```bash List Packages
+pixi list
+```
+
+</CodeGroup>
+
+## Advanced Workspace Configuration
+
+### Multiple Workspace Packages
+
+You can have multiple packages at the root level:
+
+```text
+workspace/
+├── pixi.toml              # Workspace configuration only
+├── packages/
+│   ├── package-a/
+│   │   └── pixi.toml
+│   ├── package-b/
+│   │   └── pixi.toml
+│   └── package-c/
+│       └── pyproject.toml  # With [tool.pixi.package]
+```
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64", "osx-arm64", "win-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+package-a = { path = "packages/package-a" }
+package-b = { path = "packages/package-b" }
+package-c = { path = "packages/package-c" }
+```
+
+### Workspace with Variants
+
+Build packages against multiple versions:
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64", "win-64"]
+preview = ["pixi-build"]
+
+[workspace.build-variants]  # (1)!
+python = ["3.11.*", "3.12.*"]
+
+[dependencies]
+python_rich = { path = "." }
+
+[feature.py311.dependencies]
+python = "3.11.*"
+
+[feature.py312.dependencies]
+python = "3.12.*"
+
+[environments]  # (2)!
+py311 = ["py311"]
+py312 = ["py312"]
+```
+
+1. Define allowed Python versions
+2. Create environments for each variant
+
+See the [variants guide](./variants) for details.
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Organize packages logically">
+Group related packages:
+
+```text
+workspace/
+├── pixi.toml
+├── libs/              # Shared libraries
+│   ├── core/
+│   └── utils/
+├── services/          # Applications
+│   ├── api/
+│   └── worker/
+└── tools/             # Development tools
+```
+</Accordion>
+
+<Accordion title="Use consistent versions">
+Keep package versions synchronized:
+
+```toml
+[workspace]
+version = "0.1.0"  # Shared version
+
+[package]
+version = "0.1.0"  # Same as workspace
+```
+</Accordion>
+
+<Accordion title="Minimize workspace configuration">
+Keep sub-packages minimal - they inherit from the workspace:
+
+```toml title="packages/subpkg/pixi.toml"
+# Just package-specific config
+[package]
+name = "subpkg"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-cmake", version = "0.3.*" }
+
+[package.host-dependencies]
+sdl2 = "*"
+```
+</Accordion>
+
+<Accordion title="Document dependencies">
+Comment why packages depend on each other:
+
+```toml
+[package.run-dependencies]
+# Needed for fast numerical operations
+core_math = { path = "../core_math" }
+# UI components
+ui_toolkit = { path = "../ui_toolkit" }
+```
+</Accordion>
+
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Build Variants" icon="code-branch" href="./variants">
+Build against multiple dependency versions
+</Card>
+
+<Card title="Dependency Types" icon="link" href="./dependency-types">
+Understand build, host, and run dependencies
+</Card>
+
+<Card title="Package Sources" icon="git" href="./package-source">
+Use git, path, or URL sources
+</Card>
+
+<Card title="Python Packages" icon="python" href="./python-package">
+Build Python packages in workspaces
+</Card>
+
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Package not found">
+Ensure the path is correct relative to the workspace root:
+
+```toml
+[dependencies]
+my_package = { path = "./packages/my_package" }  # Relative to workspace root
+```
+</Accordion>
+
+<Accordion title="Circular dependencies">
+Pixi doesn't support circular dependencies between packages. Restructure to have a clear dependency hierarchy.
+</Accordion>
+
+<Accordion title="Build order issues">
+Pixi automatically determines build order based on dependencies. If builds fail, check that all dependencies are properly declared.
+</Accordion>
+
+<Accordion title="Workspace settings not inherited">
+Only packages within the same workspace root inherit settings. External path dependencies don't inherit workspace configuration.
+</Accordion>

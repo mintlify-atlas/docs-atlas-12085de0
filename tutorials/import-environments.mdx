@@ -1,0 +1,638 @@
+---
+title: Importing Existing Environments
+description: Learn how to import existing conda and pip environments into Pixi workspaces.
+---
+
+Learn how to migrate existing conda environments, requirements.txt files, and environment.yml files into Pixi workspaces.
+
+## Why Import Environments?
+
+You may have existing projects using:
+- Conda `environment.yml` files
+- Pip `requirements.txt` files
+- Poetry or other dependency managers
+
+Pixi can import these environments, preserving your dependencies while adding Pixi's powerful features.
+
+## Before You Start
+
+Ensure you have a Pixi workspace. If not, create one:
+
+```bash
+pixi init my-project
+cd my-project
+```
+
+<Note>
+If you're starting from scratch, you can combine `pixi init` and `pixi import` into one command - see [pixi init --import](#combining-init-and-import) below.
+</Note>
+
+## Importing Conda Environments
+
+Import conda `environment.yml` files into your workspace.
+
+### Basic Import
+
+<Steps>
+
+### Create an environment.yml
+
+Example environment file:
+
+```yaml
+name: data-science
+channels: ["conda-forge"]
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - matplotlib
+  - pip:
+    - httpx
+    - requests
+```
+
+### Import the Environment
+
+Import into your workspace:
+
+```bash
+pixi import environment.yml
+```
+
+**What happens:**
+- Creates a feature named "data-science" (from the `name` field)
+- Creates an environment with that feature
+- Adds conda dependencies to `[feature.data-science.dependencies]`
+- Adds pip dependencies to `[feature.data-science.pypi-dependencies]`
+
+### View the Result
+
+Check your `pixi.toml`:
+
+```toml
+[feature.data-science]
+channels = ["conda-forge"]
+
+[feature.data-science.dependencies]
+python = "3.11.*"
+numpy = "*"
+pandas = "*"
+matplotlib = "*"
+
+[feature.data-science.pypi-dependencies]
+httpx = "*"
+requests = "*"
+
+[environments]
+data-science = { features = ["data-science"], no-default-feature = true }
+```
+
+### Use the Environment
+
+Run commands in the imported environment:
+
+```bash
+pixi run --environment data-science python -c "import numpy; print(numpy.__version__)"
+```
+
+</Steps>
+
+### Import Options
+
+Customize the import with options:
+
+<Tabs>
+<Tab title="Custom Feature Name">
+
+Import into a feature with a different name:
+
+```bash
+pixi import --feature ml-tools environment.yml
+```
+
+Result:
+
+```toml
+[feature.ml-tools]
+channels = ["conda-forge"]
+
+[feature.ml-tools.dependencies]
+python = "3.11.*"
+numpy = "*"
+# ...
+
+[environments]
+ml-tools = { features = ["ml-tools"], no-default-feature = true }
+```
+
+</Tab>
+<Tab title="Custom Environment Name">
+
+Import into an environment with a different name:
+
+```bash
+pixi import --environment analysis environment.yml
+```
+
+Creates an environment named "analysis" with the feature name from the file.
+
+</Tab>
+<Tab title="Specific Platforms">
+
+Import with platform restrictions:
+
+```bash
+pixi import --platform linux-64 --platform osx-arm64 environment.yml
+```
+
+Result:
+
+```toml
+[feature.data-science]
+platforms = ["linux-64", "osx-arm64"]
+channels = ["conda-forge"]
+
+[feature.data-science.target.linux-64.dependencies]
+python = "3.11.*"
+numpy = "*"
+
+[feature.data-science.target.osx-arm64.dependencies]
+python = "3.11.*"
+numpy = "*"
+```
+
+</Tab>
+</Tabs>
+
+### Merge into Existing Environments
+
+Import into an existing environment:
+
+<Steps>
+
+### Create Base Environment
+
+```yaml
+# base.yml
+name: base
+channels: ["conda-forge"]
+dependencies:
+  - python
+  - pip:
+    - httpx
+```
+
+Import:
+
+```bash
+pixi import base.yml
+```
+
+### Add More Dependencies
+
+```yaml
+# extras.yml
+channels: ["conda-forge"]
+dependencies:
+  - numpy
+  - pandas
+```
+
+Import into the existing environment:
+
+```bash
+pixi import --feature numpy-tools --environment base extras.yml
+```
+
+### Check the Result
+
+```toml
+[feature.base]
+channels = ["conda-forge"]
+
+[feature.base.dependencies]
+python = "*"
+
+[feature.base.pypi-dependencies]
+httpx = "*"
+
+[feature.numpy-tools]
+channels = ["conda-forge"]
+
+[feature.numpy-tools.dependencies]
+numpy = "*"
+pandas = "*"
+
+[environments]
+base = { features = ["base", "numpy-tools"], no-default-feature = true }
+```
+
+</Steps>
+
+### Import into Default Environment
+
+Import dependencies into the default environment:
+
+```bash
+pixi import --feature default environment.yml
+```
+
+This adds dependencies to the top-level `[dependencies]` section.
+
+## Importing PyPI Requirements
+
+Import pip `requirements.txt` files.
+
+### Basic Import
+
+<Steps>
+
+### Create requirements.txt
+
+Example requirements file:
+
+```txt
+cowpy
+array-api-extra>=0.8
+requests==2.31.0
+httpx~=0.24.0
+```
+
+### Import the File
+
+Import with a feature name:
+
+```bash
+pixi import --format pypi-txt --feature python-tools requirements.txt
+```
+
+<Note>
+For PyPI imports, you must specify either `--feature` or `--environment`.
+</Note>
+
+### View the Result
+
+```toml
+[feature.python-tools.pypi-dependencies]
+cowpy = "*"
+array-api-extra = ">=0.8"
+requests = "==2.31.0"
+httpx = "~=0.24.0"
+
+[environments]
+python-tools = { features = ["python-tools"], no-default-feature = true }
+```
+
+### Use the Environment
+
+```bash
+pixi run --environment python-tools python -c "import cowpy; print('Imported!')"
+```
+
+**Expected Output:**
+
+```
+Imported!
+```
+
+</Steps>
+
+### Advanced Requirements
+
+Pixi supports various requirement formats:
+
+<CodeGroup>
+
+```txt Version Specifiers
+numpy>=1.20.0
+pandas==2.0.0
+matplotlib~=3.8.0
+scipy>=1.10,<2.0
+```
+
+```txt Git Repositories
+git+https://github.com/user/repo.git
+git+https://github.com/user/repo.git@main
+git+https://github.com/user/repo.git@v1.0.0
+```
+
+```txt Local Paths
+./local-package
+../other-package
+/absolute/path/to/package
+```
+
+```txt Extras
+flask[async]==3.1.0
+django[argon2,bcrypt]>=4.2
+```
+
+</CodeGroup>
+
+### Multiple Requirements Files
+
+Import multiple files into the same environment:
+
+```bash
+# Import base requirements
+pixi import --format pypi-txt --feature app requirements.txt
+
+# Import dev requirements into same environment
+pixi import --format pypi-txt --feature app-dev --environment app requirements-dev.txt
+```
+
+## Combining Init and Import
+
+Combine workspace creation and import in one command:
+
+### Import Conda Environment
+
+Create a workspace from an environment.yml:
+
+```bash
+pixi init --import environment.yml
+```
+
+**Result:**
+
+```toml
+[workspace]
+name = "data-science"  # From environment.yml name field
+authors = ["Your Name <you@example.com>"]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[dependencies]
+python = "3.11.*"
+numpy = "*"
+pandas = "*"
+
+[pypi-dependencies]
+httpx = "*"
+requests = "*"
+```
+
+<Tip>
+`pixi init --import` adds dependencies to the default environment, unlike `pixi import` which creates a new environment.
+</Tip>
+
+### Override Workspace Name
+
+Specify a custom workspace name:
+
+```bash
+pixi init my-project --import environment.yml
+```
+
+<Note>
+At the time of writing, `pixi init --import` only supports the conda-env format, not pypi-txt.
+</Note>
+
+## Automatic Format Detection
+
+Pixi can detect the format automatically:
+
+```bash
+pixi import environment.yml    # Detects conda-env format
+pixi import requirements.txt   # Detects pypi-txt format
+```
+
+Or specify explicitly:
+
+```bash
+pixi import --format conda-env environment.yml
+pixi import --format pypi-txt requirements.txt
+```
+
+## Real-World Examples
+
+### Migrate a Data Science Project
+
+<Steps>
+
+### Original Setup
+
+```yaml
+# environment.yml
+name: ml-project
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.11
+  - pytorch
+  - torchvision
+  - numpy
+  - pandas
+  - matplotlib
+  - jupyter
+  - pip:
+    - transformers
+    - datasets
+```
+
+### Import
+
+```bash
+pixi init
+pixi import environment.yml
+```
+
+### Add Development Tools
+
+```bash
+pixi add --feature dev ruff mypy pytest
+pixi workspace environment add dev --feature ml-project --feature dev
+```
+
+### Result
+
+You now have:
+- `ml-project` environment: Original dependencies
+- `dev` environment: Original dependencies + dev tools
+
+</Steps>
+
+### Migrate a Web Application
+
+<Steps>
+
+### Original Setup
+
+```txt
+# requirements.txt
+flask==3.0.0
+sqlalchemy==2.0.25
+celery==5.3.4
+redis==5.0.1
+python-dotenv==1.0.0
+gunicorn==21.2.0
+```
+
+```txt
+# requirements-dev.txt
+pytest==8.0.0
+pytest-cov==4.1.0
+ruff==0.1.0
+black==23.12.0
+```
+
+### Import
+
+```bash
+pixi init web-app
+pixi import --format pypi-txt --feature app requirements.txt
+pixi import --format pypi-txt --feature dev requirements-dev.txt
+```
+
+### Create Environments
+
+```bash
+pixi workspace environment add production --feature app --no-default-feature
+pixi workspace environment add dev --feature app --feature dev --no-default-feature
+```
+
+### Result
+
+```toml
+[feature.app.pypi-dependencies]
+flask = "==3.0.0"
+sqlalchemy = "==2.0.25"
+celery = "==5.3.4"
+redis = "==5.0.1"
+python-dotenv = "==1.0.0"
+gunicorn = "==21.2.0"
+
+[feature.dev.pypi-dependencies]
+pytest = "==8.0.0"
+pytest-cov = "==4.1.0"
+ruff = "==0.1.0"
+black = "==23.12.0"
+
+[environments]
+production = { features = ["app"], no-default-feature = true }
+dev = { features = ["app", "dev"], no-default-feature = true }
+```
+
+</Steps>
+
+### Import from Poetry
+
+While Pixi doesn't directly import `pyproject.toml` from Poetry, you can export and import:
+
+```bash
+# Export from Poetry
+poetry export -f requirements.txt --output requirements.txt
+poetry export -f requirements.txt --only dev --output requirements-dev.txt
+
+# Import to Pixi
+pixi init
+pixi import --format pypi-txt --feature default requirements.txt
+pixi import --format pypi-txt --feature dev requirements-dev.txt
+```
+
+## Post-Import Tasks
+
+After importing, you may want to:
+
+### Add Tasks
+
+Define common commands:
+
+```toml
+[feature.data-science.tasks]
+notebook = "jupyter notebook"
+lab = "jupyter lab"
+analysis = "python analysis.py"
+```
+
+### Add More Dependencies
+
+```bash
+pixi add --feature data-science scipy scikit-learn
+```
+
+### Create Additional Environments
+
+```bash
+pixi workspace environment add test --feature data-science --feature test
+```
+
+### Update Lock File
+
+```bash
+pixi install
+```
+
+## Troubleshooting
+
+### Import Format Not Detected
+
+Specify the format explicitly:
+
+```bash
+pixi import --format conda-env environment.yml
+pixi import --format pypi-txt requirements.txt
+```
+
+### Feature Name Required
+
+For PyPI imports, always specify a feature or environment:
+
+```bash
+pixi import --feature my-feature requirements.txt
+```
+
+### Platform-Specific Dependencies
+
+Some dependencies may not be available on all platforms. Use platform-specific imports:
+
+```bash
+pixi import --platform linux-64 environment.yml
+```
+
+### Version Conflicts
+
+If you encounter conflicts after import:
+
+1. Check the lock file: `pixi lock`
+2. Update specific packages: `pixi update package-name`
+3. Adjust version constraints in `pixi.toml`
+
+## Best Practices
+
+<Tip>
+**Test after import:**
+Always test your imported environments to ensure everything works.
+</Tip>
+
+<Tip>
+**Use features for organization:**
+Import related dependencies into separate features for better organization.
+</Tip>
+
+<Tip>
+**Specify platforms:**
+If your environment is platform-specific, use `--platform` to document this.
+</Tip>
+
+<Tip>
+**Keep original files:**
+Keep the original environment.yml or requirements.txt for reference during migration.
+</Tip>
+
+## Next Steps
+
+- Learn about [multi-environment workspaces](/tutorials/multi-environment)
+- Explore [Python development](/tutorials/python) with Pixi
+- Understand [pyproject.toml integration](/tutorials/pyproject-toml)
+
+## Future Improvements
+
+Pixi's import capabilities are actively being developed. Track progress:
+
+- [Import roadmap issue on GitHub](https://github.com/prefix-dev/pixi/issues/4192)
+- More import formats coming soon
+- Enhanced Poetry/PDM integration planned

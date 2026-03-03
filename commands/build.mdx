@@ -1,0 +1,113 @@
+---
+title: pixi build
+---
+
+Build a conda package from a Pixi package.
+
+## Usage
+
+```bash
+pixi build [OPTIONS]
+```
+
+## Description
+
+The `pixi build` command builds a conda package from a workspace that contains a `[package]` section in its manifest. This command uses the pixi-build system to create distributable conda packages.
+
+## Options
+
+<ParamField path="--path" type="path">
+  The path to a directory containing a package manifest, or to a specific manifest file.
+  
+  Supported manifest files: `package.xml`, `recipe.yaml`, `pixi.toml`, `pyproject.toml`, or `mojoproject.toml`.
+  
+  When a directory is provided, the command will search for supported manifest files within it.
+</ParamField>
+
+<ParamField path="--target-platform" type="platform" default="current">
+  The target platform to build for.
+  
+  ```bash
+  pixi build --target-platform linux-64
+  pixi build --target-platform osx-arm64
+  ```
+</ParamField>
+
+<ParamField path="--build-platform" type="platform" default="current">
+  The build platform to use for building.
+  
+  ```bash
+  pixi build --build-platform linux-64
+  ```
+</ParamField>
+
+<ParamField path="--output-dir" type="path" default=".">
+  The output directory to place the built artifacts.
+  
+  ```bash
+  pixi build --output-dir ./dist
+  ```
+</ParamField>
+
+<ParamField path="--build-dir" type="path">
+  The directory to use for incremental builds artifacts.
+  
+  ```bash
+  pixi build --build-dir ./build
+  ```
+</ParamField>
+
+<ParamField path="--clean" type="boolean">
+  Whether to clean the build directory before building.
+  
+  ```bash
+  pixi build --clean
+  ```
+</ParamField>
+
+## Examples
+
+### Build current package
+
+Build the package in the current directory:
+
+```bash
+pixi build
+```
+
+### Build for specific platform
+
+Build a package for a different target platform:
+
+```bash
+pixi build --target-platform linux-64
+```
+
+### Build with clean
+
+Clean the build directory before building:
+
+```bash
+pixi build --clean --output-dir ./dist
+```
+
+### Build from specific path
+
+Build a package from a specific manifest file:
+
+```bash
+pixi build --path ./my-package/pixi.toml
+```
+
+## How it Works
+
+1. **Locates the workspace** based on the provided path or current directory
+2. **Validates the manifest** ensures it contains a `[package]` section
+3. **Resolves dependencies** using the configured channels and platforms
+4. **Builds the package** using the appropriate build backend
+5. **Outputs artifacts** to the specified output directory
+
+## Related Commands
+
+- [`pixi upload`](/commands/upload) - Upload built packages to a channel
+- [`pixi init`](/commands/init) - Initialize a new pixi workspace

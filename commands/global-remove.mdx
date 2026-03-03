@@ -1,0 +1,137 @@
+---
+title: pixi global remove
+description: Remove dependencies from a global environment
+---
+
+Removes dependencies from a global environment. To remove the entire environment, use `pixi global uninstall` instead.
+
+## Usage
+
+```bash
+pixi global remove [OPTIONS] <PACKAGE>...
+```
+
+**Alias:** `pixi g remove`, `pixi g rm`
+
+## Arguments
+
+<ParamField path="PACKAGE" type="string" required>
+  Package(s) to remove from the environment.
+  
+  Multiple packages can be specified.
+</ParamField>
+
+## Options
+
+<ParamField path="--environment" type="string" shorthand="e" required>
+  The environment from which dependencies should be removed.
+</ParamField>
+
+## Examples
+
+### Remove a package from an environment
+
+```bash
+pixi global remove --environment python numpy
+```
+
+### Remove multiple packages
+
+```bash
+pixi global remove --environment python numpy pandas matplotlib
+```
+
+## How It Works
+
+1. **Removes the package** from the environment's manifest
+2. **Removes exposed executables** that belong to the package
+3. **Syncs the environment** to reflect the changes
+4. **Updates shortcuts** if applicable
+
+<Note>
+  The `--environment` flag is required. If you want to remove the entire environment, use `pixi global uninstall` instead.
+</Note>
+
+## Use Cases
+
+### Clean Up Dependencies
+
+Remove packages you no longer need:
+
+```bash
+pixi global remove --environment ds old-package
+```
+
+### Remove Additional Dependencies
+
+If you installed packages with `--with`, you can remove them:
+
+```bash
+# Previously installed:
+# pixi global install jupyter --with matplotlib
+
+# Remove matplotlib:
+pixi global remove --environment jupyter matplotlib
+```
+
+## What Gets Removed
+
+- The package entry from the environment's manifest
+- Exposed executables from that package
+- The package and its unique dependencies from the environment
+
+## What Doesn't Get Removed
+
+- Shared dependencies (used by other packages in the environment)
+- The environment itself (use `pixi global uninstall` for that)
+
+## Error Handling
+
+If the removal fails, pixi will attempt to revert the changes:
+
+```bash
+pixi global remove --environment myenv package-name
+# If this fails, the environment remains in its previous state
+```
+
+<Tip>
+  Use `pixi g rm` as a shorthand for `pixi global remove`.
+</Tip>
+
+## Viewing Changes
+
+After removal, you can check the environment:
+
+```bash
+pixi global list --environment myenv
+```
+
+## Complete Example
+
+```bash
+# Install jupyter with extra packages
+pixi global install --environment science jupyter matplotlib pandas numpy
+
+# Later, remove matplotlib and pandas
+pixi global remove --environment science matplotlib pandas
+
+# Verify the changes
+pixi global list --environment science
+```
+
+## Differences from `pixi global uninstall`
+
+| Feature | `global remove` | `global uninstall` |
+|---------|----------------|--------------------|
+| Scope | Removes packages | Removes environment |
+| Requires `--environment` | Yes | No |
+| Keeps environment | Yes | No |
+| Removes executables | Only from removed packages | All |
+
+## Syncing After Removal
+
+The environment is automatically synced after removal. If you want to ensure everything is in sync:
+
+```bash
+pixi global sync
+```

@@ -1,0 +1,547 @@
+---
+title: pixi update
+description: Update dependencies in the lock file
+---
+
+The `pixi update` command updates the lock file to use newer versions of dependencies while respecting manifest constraints.
+
+## Usage
+
+```bash
+pixi update [OPTIONS] [PACKAGES]...
+```
+
+## Overview
+
+The `pixi update` command:
+
+1. **Unlocks** specified packages in the lock file
+2. **Re-resolves** dependencies to find newer versions
+3. **Updates** the lock file with new versions
+4. **Installs** updated environments (unless `--no-install`)
+
+<Note>
+  `pixi update` respects version constraints in your manifest. It will only update to versions that satisfy your specifications.
+</Note>
+
+## Arguments
+
+<ParamField path="PACKAGES" type="string">
+  Specific package(s) to update. If not provided, all packages are updated.
+</ParamField>
+
+```bash
+pixi update              # Update all packages
+pixi update numpy        # Update only numpy
+pixi update numpy pandas # Update numpy and pandas
+```
+
+## Options
+
+### Environment Filter
+
+<ParamField path="--environment" type="string">
+  Update only in specific environment(s). Can be specified multiple times.
+  
+  Short flag: `-e`
+</ParamField>
+
+```bash
+pixi update --environment prod
+pixi update -e test -e dev
+```
+
+### Platform Filter
+
+<ParamField path="--platform" type="string">
+  Update only for specific platform(s). Can be specified multiple times.
+  
+  Short flag: `-p`
+</ParamField>
+
+```bash
+pixi update --platform linux-64
+pixi update -p linux-64 -p osx-arm64
+```
+
+### Installation Control
+
+<ParamField path="--no-install" type="boolean" default="false">
+  Update lock file without installing. Useful for batch updates.
+</ParamField>
+
+```bash
+pixi update --no-install
+pixi install  # Install later
+```
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be updated without making changes.
+  
+  Short flag: `-n`
+</ParamField>
+
+```bash
+pixi update --dry-run
+```
+
+### Output Format
+
+<ParamField path="--json" type="boolean" default="false">
+  Output changes in JSON format.
+</ParamField>
+
+```bash
+pixi update --json > changes.json
+```
+
+## Examples
+
+### Update All Packages
+
+```bash
+pixi update
+```
+
+Output:
+```
+Updating lock file...
+✓ Updated 12 packages:
+  • numpy: 1.26.0 → 1.26.4
+  • pandas: 2.1.0 → 2.2.0
+  • python: 3.11.5 → 3.11.8
+```
+
+### Update Specific Package
+
+```bash
+pixi update numpy
+```
+
+Output:
+```
+✓ Updated numpy: 1.26.0 → 1.26.4
+```
+
+### Update Multiple Packages
+
+```bash
+pixi update numpy pandas scipy
+```
+
+Output:
+```
+✓ Updated 3 packages:
+  • numpy: 1.26.0 → 1.26.4
+  • pandas: 2.1.0 → 2.2.0
+  • scipy: 1.11.0 → 1.12.0
+```
+
+### Update for Specific Environment
+
+```bash
+pixi update --environment prod
+```
+
+Output:
+```
+✓ Updated prod environment:
+  • python: 3.11.5 → 3.11.8
+  • numpy: 1.26.0 → 1.26.4
+```
+
+### Update for Specific Platform
+
+```bash
+pixi update --platform linux-64
+```
+
+Output:
+```
+✓ Updated linux-64 platform:
+  • cuda: 12.1.0 → 12.2.0
+  • cudatoolkit: 11.8.0 → 12.1.0
+```
+
+### Dry Run
+
+See what would be updated without making changes:
+
+```bash
+pixi update --dry-run
+```
+
+Output:
+```
+Would update 8 packages:
+  • numpy: 1.26.0 → 1.26.4
+  • pandas: 2.1.0 → 2.2.0
+  • python: 3.11.5 → 3.11.8
+  ...
+```
+
+### JSON Output
+
+```bash
+pixi update --json
+```
+
+Output:
+```json
+{
+  "version": "1",
+  "environments": {
+    "default": {
+      "linux-64": {
+        "updated": [
+          {
+            "name": "numpy",
+            "before": "1.26.0",
+            "after": "1.26.4"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+### No Changes
+
+When already up-to-date:
+
+```bash
+pixi update
+```
+
+Output:
+```
+✓ Lock-file was already up-to-date
+```
+
+## Behavior Details
+
+### Version Constraint Respect
+
+Manifest:
+```toml
+[dependencies]
+numpy = ">=1.20,<2.0"
+```
+
+```bash
+pixi update numpy
+```
+
+Result: Updates to latest 1.x version (e.g., 1.26.4), **not** 2.0+
+
+### Dependency Updates
+
+Updating a package also updates its dependencies:
+
+```bash
+pixi update pandas
+```
+
+May also update:
+- `numpy` (pandas dependency)
+- `python-dateutil` (pandas dependency)
+- Other transitive dependencies
+
+### Platform-Specific Updates
+
+With platform-specific dependencies:
+
+```toml
+[target.linux-64.dependencies]
+cuda = ">=12.0"
+
+[target.osx-arm64.dependencies]
+metal = "*"
+```
+
+```bash
+pixi update --platform linux-64
+```
+
+Only updates `cuda` and linux-64 packages, not `metal`.
+
+### Environment-Specific Updates
+
+```toml
+[feature.test.dependencies]
+pytest = ">=8.0"
+
+[feature.prod.dependencies]
+gunicorn = ">=20.0"
+
+[environments]
+test = ["test"]
+prod = ["prod"]
+```
+
+```bash
+pixi update --environment test
+```
+
+Only updates packages in the `test` environment.
+
+## Combining Filters
+
+### Package + Environment
+
+```bash
+pixi update numpy --environment prod
+```
+
+Updates `numpy` only in the `prod` environment.
+
+### Package + Platform
+
+```bash
+pixi update cuda --platform linux-64
+```
+
+Updates `cuda` only for `linux-64` platform.
+
+### Environment + Platform
+
+```bash
+pixi update --environment prod --platform linux-64
+```
+
+Updates all packages in `prod` environment on `linux-64` platform.
+
+### All Filters Combined
+
+```bash
+pixi update numpy pandas \
+  --environment prod \
+  --platform linux-64 \
+  --no-install
+```
+
+Updates `numpy` and `pandas` in `prod` environment for `linux-64`, without installing.
+
+## Update vs Upgrade
+
+<Note>
+  `pixi update` and `pixi upgrade` are different commands:
+</Note>
+
+| Feature | `pixi update` | `pixi upgrade` |
+|---------|---------------|----------------|
+| Modifies manifest | No | Yes |
+| Respects constraints | Yes | Loosens constraints |
+| Updates lock file | Yes | Yes |
+| Use case | Regular updates | Major version bumps |
+
+```bash
+# Update within constraints
+pixi update numpy  # 1.26.0 → 1.26.4
+
+# Upgrade to newer version
+pixi upgrade numpy  # 1.26.0 → 2.0.0 (updates manifest)
+```
+
+## Use Cases
+
+### Regular Maintenance
+
+Keep dependencies up-to-date:
+
+```bash
+# Weekly update routine
+pixi update
+pixi run pytest  # Test after update
+```
+
+### Security Patches
+
+Update specific vulnerable package:
+
+```bash
+pixi update requests
+```
+
+### Pre-Production Testing
+
+Test updates without affecting dev:
+
+```bash
+pixi update --environment staging --dry-run
+```
+
+### CI/CD Integration
+
+Automated update checks:
+
+```bash
+#!/bin/bash
+if pixi update --dry-run | grep -q "Would update"; then
+  echo "Updates available"
+  pixi update --no-install
+  pixi install
+  pixi run pytest
+fi
+```
+
+### Multi-Platform Maintenance
+
+Update each platform separately:
+
+```bash
+pixi update --platform linux-64
+pixi update --platform osx-arm64
+pixi update --platform win-64
+```
+
+## Global Options
+
+<ParamField path="--manifest-path" type="string">
+  Path to `pixi.toml`, `pyproject.toml`, or workspace directory.
+  
+  Short flag: `-m`
+</ParamField>
+
+```bash
+pixi update --manifest-path /path/to/project
+```
+
+## Config Options
+
+- `--auth-file <FILE>`: Authentication credentials
+- `--tls-no-verify`: Disable TLS verification
+- `--concurrent-solves <N>`: Max concurrent solves
+
+## Troubleshooting
+
+### Package Not Found
+
+Error: `could not find a package named 'numpyy'`
+
+Solution: Check spelling and verify package is in lock file:
+
+```bash
+pixi list | grep numpy
+pixi update numpy
+```
+
+Suggestions will be provided:
+```
+Error: could not find a package named 'numpyy'
+Help: did you mean 'numpy'?
+```
+
+### No Updates Available
+
+```bash
+pixi update numpy
+```
+
+Output:
+```
+✓ Lock-file was already up-to-date
+```
+
+Package is already at the latest version satisfying constraints.
+
+### Version Constraints Too Strict
+
+Manifest:
+```toml
+[dependencies]
+numpy = "==1.20.0"  # Pinned exactly
+```
+
+```bash
+pixi update numpy
+```
+
+Output:
+```
+✓ Lock-file was already up-to-date
+```
+
+Solution: Loosen constraints or use `pixi upgrade`:
+
+```bash
+pixi upgrade numpy  # Loosens constraint
+```
+
+### Solver Conflicts
+
+Error: `cannot solve dependencies`
+
+Solution: Update conflicting packages together:
+
+```bash
+pixi update numpy pandas scipy  # Update all at once
+```
+
+Or check manifest constraints:
+
+```toml
+[dependencies]
+numpy = ">=1.20,<2.0"
+pandas = ">=2.0"  # May require numpy >=1.24
+```
+
+### Environment Not Found
+
+Error: `could not find an environment named 'production'`
+
+Solution: Check environment names:
+
+```bash
+pixi info
+```
+
+Use correct environment name:
+```bash
+pixi update --environment prod  # not 'production'
+```
+
+## Best Practices
+
+1. **Update regularly** to get security patches:
+   ```bash
+   pixi update  # Weekly or monthly
+   ```
+
+2. **Test after updates**:
+   ```bash
+   pixi update
+   pixi run pytest
+   ```
+
+3. **Use dry-run first** for large projects:
+   ```bash
+   pixi update --dry-run
+   pixi update  # If changes look good
+   ```
+
+4. **Update environments separately** in multi-env projects:
+   ```bash
+   pixi update --environment dev
+   pixi update --environment prod  # After testing
+   ```
+
+5. **Commit lock file changes**:
+   ```bash
+   pixi update
+   git add pixi.lock
+   git commit -m "Update dependencies"
+   ```
+
+6. **Use CI to detect updates**:
+   ```yaml
+   # .github/workflows/update-check.yml
+   - run: pixi update --dry-run
+   ```
+
+## See Also
+
+- [pixi upgrade](/commands/upgrade) - Upgrade dependencies with manifest changes
+- [pixi install](/commands/install) - Install dependencies
+- [pixi add](/commands/add) - Add new dependencies

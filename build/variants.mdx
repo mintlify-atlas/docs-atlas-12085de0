@@ -1,0 +1,499 @@
+---
+title: Build Variants
+description: Build packages against multiple dependency versions with build variants
+---
+
+Learn how to create build matrices that produce packages for different dependency versions, similar to parameterized builds or build configurations.
+
+<Warning>
+`pixi-build` is a preview feature and will change until stabilized. Keep this in mind when using it for your projects.
+</Warning>
+
+## Why Use Build Variants?
+
+Build variants solve version compatibility challenges:
+
+- **Multiple Python versions** - Support Python 3.11, 3.12, 3.13, etc.
+- **Library versions** - Build against different versions of dependencies
+- **Testing** - Verify compatibility across version ranges
+- **Distribution** - Provide packages for various configurations
+
+<Note>
+In the conda ecosystem, this functionality is called "variants." Other build systems might call this a build matrix, build configurations, or parameterized builds.
+</Note>
+
+## The Problem Variants Solve
+
+Consider a C++ package built for Python 3.12:
+
+```toml
+[package.host-dependencies]
+python = "3.12.*"
+```
+
+If a user tries to use this package with Python 3.11, Pixi reports a version conflict. Variants allow you to build multiple versions of the package, each compatible with different Python versions.
+
+## Creating Build Variants
+
+<Steps>
+
+### Start with a Workspace
+
+Begin with the workspace from the [workspace tutorial](./workspace):
+
+```text
+workspace/
+├── pixi.toml
+├── pyproject.toml
+├── src/
+│   └── python_rich/
+│       └── __init__.py
+└── packages/
+    └── cpp_math/
+        ├── pixi.toml
+        ├── CMakeLists.txt
+        └── src/
+            └── math.cpp
+```
+
+### Relax Version Constraints
+
+First, change the Python requirement in the C++ package to accept any version:
+
+```toml title="packages/cpp_math/pixi.toml" {5}
+[package]
+name = "cpp_math"
+version = "0.1.0"
+
+[package.host-dependencies]
+cmake = ">=3.20, <3.27"
+nanobind = ">=2.4.0, <2.5.0"
+python = "*"  # (1)!
+```
+
+1. Changed from `"3.12.*"` to `"*"` to allow any Python version
+
+### Define Allowed Variants
+
+Specify which Python versions to support:
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64", "win-64"]
+preview = ["pixi-build"]
+
+[workspace.build-variants]
+python = ["3.11.*", "3.12.*"]  # (1)!
+
+[dependencies]
+python_rich = { path = "." }
+```
+
+1. Pixi will build packages for both Python 3.11 and 3.12
+
+<Note>
+Without explicit environments, Pixi chooses a version based on the solver. To test both versions, create explicit environments.
+</Note>
+
+### Create Environments for Each Variant
+
+Define environments that pin specific Python versions:
+
+```toml title="pixi.toml"
+[feature.py311.dependencies]
+python = "3.11.*"
+
+[feature.py312.dependencies]
+python = "3.12.*"
+
+[environments]
+py311 = ["py311"]  # (1)!
+py312 = ["py312"]  # (2)!
+```
+
+1. Environment using Python 3.11
+2. Environment using Python 3.12
+
+### Verify Different Builds
+
+Check that different packages were built:
+
+```bash
+pixi list --environment py311
+```
+
+```text
+Package            Version     Build               Size       Kind   Source
+python             3.11.11     h9e4cc4f_1_cpython  29.2 MiB   conda  python
+cpp_math           0.1.0       py311h43a39b2_0                conda  cpp_math
+python_rich        0.1.0       pyhbf21a9e_0                   conda  python_rich
+```
+
+```bash
+pixi list --environment py312
+```
+
+```text
+Package            Version     Build               Size       Kind   Source
+python             3.12.8      h9e4cc4f_1_cpython  30.1 MiB   conda  python
+cpp_math           0.1.0       py312h2078e5b_0                conda  cpp_math
+python_rich        0.1.0       pyhbf21a9e_0                   conda  python_rich
+```
+
+<Note>
+Notice the different build strings:
+- `cpp_math` has different builds: `py311h43a39b2_0` vs `py312h2078e5b_0`
+- `python_rich` has the same build: `pyhbf21a9e_0` (noarch Python package)
+</Note>
+
+</Steps>
+
+## Complete Example
+
+Here's the full configuration:
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64", "win-64"]
+preview = ["pixi-build"]
+
+[workspace.build-variants]
+python = ["3.11.*", "3.12.*"]
+
+[dependencies]
+python_rich = { path = "." }
+
+[feature.py311.dependencies]
+python = "3.11.*"
+
+[feature.py312.dependencies]
+python = "3.12.*"
+
+[environments]
+py311 = ["py311"]
+py312 = ["py312"]
+
+[tasks]
+start = "rich-example-main"
+
+[package]
+name = "python_rich"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+
+[package.build.config]
+noarch = false  # (1)!
+
+[package.host-dependencies]
+hatchling = "==1.26.3"
+python = "*"  # (2)!
+
+[package.run-dependencies]
+cpp_math = { path = "packages/cpp_math" }
+rich = ">=13.9.4,<14"
+```
+
+1. Disable noarch to create variant-specific builds
+2. Allow any Python version - resolved by variants
+
+## Multiple Variant Dimensions
+
+You can create variants for multiple dependencies:
+
+```toml
+[workspace.build-variants]
+python = ["3.11.*", "3.12.*", "3.13.*"]
+nanobind = ["2.3.*", "2.4.*"]
+```
+
+This creates a build matrix:
+- Python 3.11 + nanobind 2.3
+- Python 3.11 + nanobind 2.4
+- Python 3.12 + nanobind 2.3
+- Python 3.12 + nanobind 2.4
+- Python 3.13 + nanobind 2.3
+- Python 3.13 + nanobind 2.4
+
+<Warning>
+Be careful with variant matrices - they grow exponentially! 3 Python versions × 2 nanobind versions × 4 platforms = 24 packages.
+</Warning>
+
+## Variant Files
+
+For complex configurations, use external variant files:
+
+```toml title="pixi.toml"
+[workspace.build-variants]
+files = ["variants.yaml"]
+```
+
+```yaml title="variants.yaml"
+python:
+  - 3.11.*
+  - 3.12.*
+  - 3.13.*
+
+nanobind:
+  - 2.4.*
+  - 2.5.*
+
+zip_keys:
+  - [python, nanobind]  # (1)!
+```
+
+1. Create paired variants instead of a full matrix
+
+This creates only paired combinations:
+- Python 3.11 + nanobind 2.4
+- Python 3.12 + nanobind 2.5
+- Python 3.13 + nanobind 2.5
+
+See the [manifest reference](../reference/pixi_manifest#build-variants-files-optional) for details.
+
+## Testing Across Variants
+
+### Run Tests in All Environments
+
+```bash
+pixi run --environment py311 test
+pixi run --environment py312 test
+```
+
+### Run Tasks in All Environments
+
+Use a loop (bash):
+
+```bash
+for env in py311 py312 py313; do
+  echo "Testing in $env"
+  pixi run --environment $env test
+done
+```
+
+### Define Environment-Specific Tasks
+
+```toml
+[feature.py311.tasks]
+test = "pytest tests/"
+
+[feature.py312.tasks]
+test = "pytest tests/ --strict-markers"
+
+[feature.py313.tasks]
+test = "pytest tests/ --strict-markers --new-feature"
+```
+
+## Understanding Build Strings
+
+Build strings indicate package variants:
+
+```text
+cpp_math-0.1.0-py311h43a39b2_0.conda
+                ^^^^^ ^^^^^^^^
+                |     |
+                |     Hash of dependencies
+                Python version
+```
+
+Breakdown:
+- `py311` - Python 3.11 variant
+- `h43a39b2` - Hash of build configuration
+- `_0` - Build number
+
+<Note>
+Noarch packages (pure Python) have the same build string across variants:
+
+```text
+python_rich-0.1.0-pyhbf21a9e_0.conda
+                   ^^ ^^^^^^^^
+                   |  |
+                   |  Hash
+                   Python (noarch)
+```
+</Note>
+
+## Platform vs Variant Matrix
+
+**Platforms** - Different OS/architectures:
+```toml
+[workspace]
+platforms = ["linux-64", "osx-arm64", "win-64"]
+```
+
+**Variants** - Different dependency versions:
+```toml
+[workspace.build-variants]
+python = ["3.11.*", "3.12.*"]
+```
+
+**Combined**: 3 platforms × 2 Python versions = 6 packages
+
+## Common Variant Patterns
+
+<CodeGroup>
+
+```toml Python Versions
+[workspace.build-variants]
+python = ["3.11.*", "3.12.*", "3.13.*"]
+```
+
+```toml NumPy Versions
+[workspace.build-variants]
+numpy = ["1.24.*", "1.25.*", "1.26.*"]
+```
+
+```toml CUDA Versions
+[workspace.build-variants]
+cuda = ["11.8", "12.0", "12.1"]
+```
+
+```toml Multiple Dependencies
+[workspace.build-variants]
+python = ["3.11.*", "3.12.*"]
+tensorflow = ["2.13.*", "2.14.*"]
+```
+
+</CodeGroup>
+
+## Advanced: Conditional Variants
+
+Use variant files for platform-specific variants:
+
+```yaml title="variants.yaml"
+python:
+  - 3.11.*
+  - 3.12.*
+
+cuda:
+  - 11.8  # linux-64 only
+  - 12.0  # linux-64 only
+
+pin_run_as_build:
+  python:
+    min_pin: x.x
+    max_pin: x.x
+```
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Start with minimal variants">
+Begin with essential versions:
+
+```toml
+# Start simple
+[workspace.build-variants]
+python = ["3.11.*", "3.12.*"]
+
+# Expand later
+python = ["3.10.*", "3.11.*", "3.12.*", "3.13.*"]
+```
+</Accordion>
+
+<Accordion title="Use version ranges in packages">
+Make packages flexible:
+
+```toml
+[package.host-dependencies]
+python = "*"           # Any version
+nanobind = ">=2.4,<3"  # Range
+```
+</Accordion>
+
+<Accordion title="Test with CI/CD">
+Automate variant testing:
+
+```yaml
+jobs:
+  test:
+    strategy:
+      matrix:
+        environment: [py311, py312, py313]
+    steps:
+      - run: pixi run --environment ${{ matrix.environment }} test
+```
+</Accordion>
+
+<Accordion title="Document required variants">
+Explain why variants exist:
+
+```toml
+[workspace.build-variants]
+# Support Python 3.11+ for modern type hints
+# Support Python 3.12+ for better performance
+python = ["3.11.*", "3.12.*"]
+```
+</Accordion>
+
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Dependency Types" icon="link" href="./dependency-types">
+Understand how variants affect dependencies
+</Card>
+
+<Card title="Workspaces" icon="folder-tree" href="./workspace">
+Use variants in multi-package workspaces
+</Card>
+
+<Card title="Build Backends" icon="gears" href="./backends">
+Backend-specific variant support
+</Card>
+
+<Card title="Manifest Reference" icon="book" href="../reference/pixi_manifest">
+Complete variant configuration options
+</Card>
+
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Variants not creating different builds">
+Check that:
+1. Package has `noarch = false` (or omit it)
+2. Dependency uses `*` or a range: `python = "*"`
+3. Variant is actually used in dependencies
+
+```toml
+[package.build.config]
+noarch = false  # Required for variants
+
+[package.host-dependencies]
+python = "*"  # Must allow variant resolution
+```
+</Accordion>
+
+<Accordion title="Too many builds">
+Reduce variant dimensions:
+
+```toml
+# Instead of this (6 builds)
+[workspace.build-variants]
+python = ["3.11.*", "3.12.*", "3.13.*"]
+nanobind = ["2.4.*", "2.5.*"]
+
+# Do this (3 builds)
+[workspace.build-variants]
+python = ["3.11.*", "3.12.*", "3.13.*"]
+```
+</Accordion>
+
+<Accordion title="Environment resolution fails">
+Ensure environment pinning matches variants:
+
+```toml
+[workspace.build-variants]
+python = ["3.11.*", "3.12.*"]  # Must match environment pins
+
+[feature.py311.dependencies]
+python = "3.11.*"  # Matches variant
+```
+</Accordion>

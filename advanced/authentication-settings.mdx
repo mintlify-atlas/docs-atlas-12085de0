@@ -1,0 +1,247 @@
+---
+title: Authentication Settings
+description: Configure authentication for conda channels and PyPI registries
+---
+
+Pixi supports multiple authentication methods for accessing private conda channels and PyPI registries.
+
+## Authentication Storage
+
+By default, pixi uses the system keyring to store credentials securely. If no keyring is available, credentials fall back to file storage.
+
+### Default Authentication Sources
+
+1. **System Keyring** (preferred)
+2. **File storage** at `~/.rattler/credentials.json`
+3. **`.netrc` file** authentication
+
+### Override Authentication File
+
+Force pixi to use a specific JSON file for authentication instead of the keyring.
+
+<ParamField path="authentication-override-file" type="string">
+  Path to authentication JSON file
+</ParamField>
+
+```toml
+authentication-override-file = "/path/to/credentials.json"
+```
+
+Or via environment variable:
+
+```bash
+export RATTLER_AUTH_FILE="/path/to/credentials.json"
+```
+
+### Authentication File Format
+
+The credentials file uses JSON format:
+
+```json
+{
+  "*.prefix.dev": {
+    "BearerToken": "your-token-here"
+  },
+  "conda.anaconda.org": {
+    "BasicHTTP": {
+      "username": "user",
+      "password": "pass"
+    }
+  },
+  "pypi.company.com": {
+    "BearerToken": "pypi-token"
+  }
+}
+```
+
+## Authentication Methods
+
+### Bearer Token Authentication
+
+Used for token-based authentication with conda channels and PyPI.
+
+```json
+{
+  "*.prefix.dev": {
+    "BearerToken": "pfx_xxxxxxxxxxxxx"
+  }
+}
+```
+
+### Basic HTTP Authentication
+
+Username and password authentication for conda channels.
+
+```json
+{
+  "conda.anaconda.org": {
+    "BasicHTTP": {
+      "username": "myuser",
+      "password": "mypassword"
+    }
+  }
+}
+```
+
+### Conda Token Authentication
+
+Anaconda.org-style token authentication.
+
+```json
+{
+  "anaconda.org": {
+    "CondaToken": "your-conda-token"
+  }
+}
+```
+
+## TLS Configuration
+
+### tls-no-verify
+
+Disable TLS certificate verification for all connections.
+
+<ParamField path="tls-no-verify" type="boolean" default="false">
+  When `true`, disables TLS verification for conda and PyPI
+</ParamField>
+
+```toml
+tls-no-verify = true
+```
+
+Or via CLI:
+
+```bash
+pixi install --tls-no-verify
+```
+
+<Warning>
+  This is a security risk. Only use for testing or internal networks. For PyPI-specific needs, use `pypi-config.allow-insecure-host` instead.
+</Warning>
+
+#### PyPI Implementation Details
+
+<Note>
+  Since uv doesn't support global TLS verification disable, pixi automatically adds all configured PyPI index hosts to the trusted hosts list when `tls-no-verify` is enabled. For the main PyPI index, `files.pythonhosted.org` is also added.
+</Note>
+
+**Important limitation**: If your custom PyPI index redirects downloads to a different host (e.g., CDN), that download host is **not** automatically trusted. You must manually add it to `pypi-config.allow-insecure-host`.
+
+### tls-root-certs
+
+Control which TLS root certificates are used for HTTPS connections.
+
+<ParamField path="tls-root-certs" type="enum" default="webpki">
+  Available options:
+  - `webpki`: Bundled Mozilla root certificates (most portable)
+  - `native`: System certificate store (required for corporate CAs)
+  - `all`: Both bundled and system certificates
+</ParamField>
+
+```toml
+tls-root-certs = "native"
+```
+
+Or via CLI:
+
+```bash
+pixi install --tls-root-certs native
+```
+
+Or via environment variable:
+
+```bash
+export PIXI_TLS_ROOT_CERTS=native
+```
+
+<Note>
+  This setting only affects `rustls-tls` builds (standalone binaries from GitHub releases). For `native-tls` builds (conda-forge packages), the system's TLS library always uses system certificates.
+</Note>
+
+## Using CLI Authentication Commands
+
+Pixi provides CLI commands to manage authentication:
+
+```bash
+# Login to a conda channel
+pixi auth login conda.anaconda.org --token your-token
+
+# Login with username/password
+pixi auth login conda.anaconda.org --username user --password pass
+
+# Logout from a channel
+pixi auth logout conda.anaconda.org
+```
+
+## Environment Variables
+
+### RATTLER_AUTH_FILE
+
+Overrides the default authentication file location.
+
+```bash
+export RATTLER_AUTH_FILE="/secure/path/credentials.json"
+pixi install
+```
+
+When set, this is the **only** source of authentication data used by pixi.
+
+## Best Practices
+
+### Security Recommendations
+
+1. **Use system keyring** when available for maximum security
+2. **Restrict file permissions** for credential files:
+   ```bash
+   chmod 600 ~/.rattler/credentials.json
+   ```
+3. **Use environment-specific tokens** rather than sharing credentials
+4. **Rotate tokens regularly** for production systems
+5. **Never commit credentials** to version control
+
+### Corporate Environments
+
+For corporate networks with custom CA certificates:
+
+```toml
+tls-root-certs = "native"  # or "all"
+```
+
+This ensures pixi trusts your organization's certificate authority.
+
+### CI/CD Pipelines
+
+For automated environments:
+
+```bash
+# Set credentials via environment variable
+export RATTLER_AUTH_FILE="/workspace/credentials.json"
+
+# Or use inline authentication in channel URLs
+pixi install --channel "https://token:$TOKEN@conda.company.com/channel"
+```
+
+## Troubleshooting
+
+### Authentication Not Working
+
+1. Check credential format in JSON file
+2. Verify file permissions (should be readable)
+3. Ensure URL pattern matches your channel URL
+4. Use `pixi info -vvv` to see authentication attempts
+
+### TLS Certificate Errors
+
+1. For corporate CAs: Use `tls-root-certs = "native"`
+2. For self-signed certs: Add to `pypi-config.allow-insecure-host`
+3. As last resort: Use `tls-no-verify = true` (not recommended)
+
+### Keyring Access Issues
+
+If keyring is unavailable or failing:
+
+```toml
+authentication-override-file = "~/.rattler/credentials.json"
+```
+
+This forces file-based authentication.

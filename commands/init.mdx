@@ -1,0 +1,421 @@
+---
+title: pixi init
+description: Create a new pixi workspace
+---
+
+The `pixi init` command creates a new pixi workspace with a manifest file and optional helpers.
+
+## Usage
+
+```bash
+pixi init [OPTIONS] [PATH]
+```
+
+## Arguments
+
+<ParamField path="PATH" type="string" default=".">
+  Where to place the workspace. Defaults to current directory.
+</ParamField>
+
+## Options
+
+### Channel Configuration
+
+<ParamField path="--channel" type="string" default="conda-forge">
+  Channel to use in the workspace. Can be specified multiple times.
+  
+  Short flag: `-c`
+</ParamField>
+
+```bash
+pixi init --channel conda-forge --channel pytorch
+pixi init -c conda-forge -c bioconda
+```
+
+### Platform Configuration
+
+<ParamField path="--platform" type="string">
+  Platforms that the workspace supports. Can be specified multiple times.
+  
+  Short flag: `-p`
+</ParamField>
+
+```bash
+pixi init --platform linux-64 --platform osx-arm64
+pixi init -p win-64 -p linux-64
+```
+
+Common platforms:
+- `linux-64`
+- `osx-64` (macOS Intel)
+- `osx-arm64` (macOS Apple Silicon)
+- `win-64`
+- `linux-aarch64`
+
+### Manifest Format
+
+<ParamField path="--format" type="enum" default="pixi">
+  The manifest format to create.
+  
+  Options:
+  - `pixi`: Creates `pixi.toml`
+  - `pyproject`: Creates `pyproject.toml`
+  - `mojoproject`: Creates `mojoproject.toml`
+</ParamField>
+
+```bash
+pixi init --format pyproject
+pixi init --format pixi
+```
+
+<Note>
+  The `--format` option is case-insensitive.
+</Note>
+
+### Import Environment
+
+<ParamField path="--import" type="string">
+  Environment.yml file to bootstrap the workspace. Converts a conda environment to pixi.
+  
+  Short flag: `-i`
+</ParamField>
+
+```bash
+pixi init --import environment.yml
+pixi init -i conda-env.yaml
+```
+
+### Source Control Management
+
+<ParamField path="--scm" type="enum">
+  Source Control Management system to configure. Creates appropriate `.gitignore` and CI templates.
+  
+  Short flag: `-s`
+  
+  Options:
+  - `github`: GitHub-specific configuration
+  - `gitlab`: GitLab-specific configuration  
+  - `codeberg`: Codeberg-specific configuration
+</ParamField>
+
+```bash
+pixi init --scm github
+pixi init -s gitlab
+```
+
+<Note>
+  The `--scm` option is case-insensitive.
+</Note>
+
+### Conda-PyPI Mapping
+
+<ParamField path="--conda-pypi-map" type="string">
+  Set a mapping between conda channels and PyPI indexes. Can be specified multiple times.
+  
+  Format: `CHANNEL=PYPI_INDEX`
+</ParamField>
+
+```bash
+pixi init --conda-pypi-map "conda-forge=https://pypi.org/simple"
+pixi init --conda-pypi-map "my-channel=https://pypi.company.com/simple"
+```
+
+## Examples
+
+### Basic Initialization
+
+Create a new workspace in the current directory:
+
+```bash
+pixi init
+```
+
+This creates:
+- `pixi.toml` with default configuration
+- `.gitignore` (if not present)
+
+### Initialize in Specific Directory
+
+```bash
+pixi init my-project
+cd my-project
+```
+
+### Python Project with PyPI
+
+Create a pyproject.toml-based project:
+
+```bash
+pixi init --format pyproject my-python-app
+```
+
+Resulting `pyproject.toml`:
+
+```toml
+[project]
+name = "my-python-app"
+version = "0.1.0"
+description = "Add a short description here"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.dependencies]
+```
+
+### Multi-Platform Project
+
+```bash
+pixi init \
+  --platform linux-64 \
+  --platform osx-64 \
+  --platform osx-arm64 \
+  --platform win-64
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[workspace]
+name = "my-project"
+version = "0.1.0"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+```
+
+### Machine Learning Project
+
+```bash
+pixi init ml-project \
+  --channel pytorch \
+  --channel nvidia \
+  --channel conda-forge \
+  --platform linux-64 \
+  --scm github
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[workspace]
+name = "ml-project"
+version = "0.1.0"
+channels = ["pytorch", "nvidia", "conda-forge"]
+platforms = ["linux-64"]
+```
+
+### Import from Conda Environment
+
+Convert an existing `environment.yml`:
+
+```yaml title="environment.yml"
+name: myenv
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+```
+
+```bash
+pixi init --import environment.yml
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[workspace]
+name = "myenv"
+channels = ["conda-forge", "defaults"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = "3.11.*"
+numpy = "*"
+pandas = "*"
+```
+
+### Bioinformatics Project
+
+```bash
+pixi init bio-pipeline \
+  --channel bioconda \
+  --channel conda-forge \
+  --platform linux-64
+```
+
+## Configuration File
+
+The default channels can be configured globally:
+
+```toml title="~/.pixi/config.toml"
+default-channels = ["conda-forge", "pytorch"]
+```
+
+Now `pixi init` will use these channels by default:
+
+```bash
+pixi init  # Uses conda-forge and pytorch
+```
+
+## Conflicts
+
+Certain options conflict with each other:
+
+- `--import` conflicts with `--channel` (channels come from environment.yml)
+- `--import` conflicts with `--format` (format is determined from import)
+- `--format` conflicts with deprecated `--pyproject` flag
+
+## Deprecated Options
+
+<Warning>
+  The `--pyproject` flag is deprecated. Use `--format pyproject` instead.
+</Warning>
+
+```bash
+# Old (deprecated)
+pixi init --pyproject
+
+# New (recommended)
+pixi init --format pyproject
+```
+
+## Project Structure
+
+After initialization, your workspace contains:
+
+```
+my-project/
+├── pixi.toml          # Manifest file
+├── .gitignore        # Git ignore patterns
+└── .pixi/            # Created on first install
+    ├── envs/
+    └── pixi.lock     # Lock file (created on install)
+```
+
+## Global Options
+
+<ParamField path="--manifest-path" type="string">
+  The path to `pixi.toml`, `pyproject.toml`, or the workspace directory.
+  
+  Short flag: `-m`
+</ParamField>
+
+```bash
+pixi init --manifest-path /path/to/project
+```
+
+## Environment Variables
+
+No environment variables affect `pixi init`.
+
+## Common Workflows
+
+### Start a New Python Project
+
+```bash
+# Initialize with pyproject.toml
+pixi init --format pyproject my-app
+cd my-app
+
+# Add Python and dependencies
+pixi add python=3.11 requests numpy
+
+# Add PyPI packages
+pixi add --pypi flask
+
+# Run your app
+pixi run python app.py
+```
+
+### Convert Conda Project to Pixi
+
+```bash
+# Start in conda project directory
+cd my-conda-project
+
+# Create pixi.toml from environment.yml
+pixi init --import environment.yml
+
+# Install and test
+pixi install
+pixi run python -c "import numpy; print(numpy.__version__)"
+```
+
+### Multi-Environment Setup
+
+```bash
+pixi init ml-project --platform linux-64
+cd ml-project
+
+# Edit pixi.toml to add environments
+```
+
+```toml title="pixi.toml"
+[workspace]
+name = "ml-project"
+channels = ["conda-forge", "pytorch"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = "3.11.*"
+
+[feature.cuda]
+dependencies = {pytorch-cuda = "11.8.*"}
+
+[feature.cpu]
+dependencies = {pytorch = "*"}
+
+[environments]
+cuda = ["cuda"]
+cpu = ["cpu"]
+```
+
+## Troubleshooting
+
+### Directory Already Exists
+
+Error: `directory 'my-project' already exists`
+
+Solution: Use a different name or initialize in the existing directory:
+
+```bash
+cd my-project
+pixi init
+```
+
+### Invalid Channel Name
+
+Error: `invalid channel name`
+
+Solution: Check channel name spelling and availability:
+
+```bash
+# Valid channels
+pixi init --channel conda-forge
+pixi init --channel https://conda.anaconda.org/conda-forge
+
+# Invalid
+pixi init --channel conda-forg  # typo
+```
+
+### Import File Not Found
+
+Error: `environment.yml not found`
+
+Solution: Provide full path to environment file:
+
+```bash
+pixi init --import /path/to/environment.yml
+```
+
+## See Also
+
+- [pixi add](/commands/add) - Add dependencies to the project
+- [pixi install](/commands/install) - Install the environment
+- [Global Configuration](/advanced/configuration) - Configure default channels

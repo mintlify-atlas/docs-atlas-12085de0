@@ -1,0 +1,246 @@
+---
+title: pixi global sync
+description: Sync global manifest with installed environments
+---
+
+Synchronizes the global manifest with installed environments. This ensures all environments match their definitions and cleans up any inconsistencies.
+
+## Usage
+
+```bash
+pixi global sync
+```
+
+**Alias:** `pixi g sync`
+
+## What It Does
+
+1. **Prunes old environments** - Removes environments not listed in the manifest
+2. **Syncs each environment** - Updates environments to match their manifests
+3. **Removes broken files** - Cleans up any broken symlinks or files
+4. **Prunes completions** (Unix only) - Removes outdated shell completion scripts
+
+## Examples
+
+### Sync all environments
+
+```bash
+pixi global sync
+```
+
+Output:
+```
+✓ Synced environment 'python'
+✓ Synced environment 'jupyter'
+✓ Removed 2 broken files
+```
+
+### When nothing needs syncing
+
+```bash
+pixi global sync
+```
+
+Output:
+```
+✓ Nothing to do. The pixi global installation is already up-to-date.
+```
+
+## When to Use
+
+### After Manual Changes
+
+If you've manually edited the global manifest:
+
+```bash
+# Edit ~/.pixi/manifests/pixi-global.toml
+vim ~/.pixi/manifests/pixi-global.toml
+
+# Sync the changes
+pixi global sync
+```
+
+### After Errors
+
+If an installation or removal failed:
+
+```bash
+pixi global install some-package
+# Error occurs...
+
+pixi global sync  # Clean up and restore consistency
+```
+
+### When Warned
+
+Pixi will warn you when environments are out of sync:
+
+```bash
+pixi global list
+# Warning: The environments are not in sync with the manifest
+# Run: pixi global sync
+
+pixi global sync
+```
+
+### After System Changes
+
+If you've:
+- Restored from backup
+- Moved the pixi directory
+- Manually deleted files
+
+```bash
+pixi global sync
+```
+
+## What Gets Synced
+
+### Packages
+
+- Installs missing packages
+- Removes packages no longer in the manifest
+- Updates packages to match specified versions
+
+### Exposed Executables
+
+- Creates missing symlinks
+- Removes broken symlinks
+- Updates symlink targets
+
+### Shortcuts
+
+- Updates desktop/start menu entries
+- Removes outdated shortcuts
+
+### Completions
+
+- Updates shell completion scripts (Unix only)
+- Removes completions for removed environments
+
+## Error Handling
+
+If syncing fails for some environments:
+
+```bash
+pixi global sync
+```
+
+Output:
+```
+✓ Synced environment 'python'
+✗ Couldn't sync environment 'jupyter'
+   Error: Package not found
+
+Error: Some environments couldn't be synced.
+```
+
+Pixi continues syncing other environments even if one fails.
+
+## Use Cases
+
+### Restore After Crash
+
+```bash
+# After a system crash
+pixi global sync
+```
+
+### Clean Installation
+
+```bash
+# After installing pixi on a new machine and copying manifests
+pixi global sync
+```
+
+### Fix Broken State
+
+```bash
+# If things seem broken
+pixi global sync
+```
+
+### Verify Installation
+
+```bash
+# After making changes, verify everything is correct
+pixi global sync
+pixi global list
+```
+
+## What Gets Removed
+
+### Environments
+
+Environments not in the manifest are removed:
+
+```bash
+# If you manually deleted an environment from the manifest
+pixi global sync  # Removes the environment directory
+```
+
+### Broken Files
+
+- Broken symlinks
+- Orphaned executable links
+- Invalid shortcuts
+
+### Old Completions
+
+Shell completions for removed environments (Unix only).
+
+<Note>
+  `pixi global sync` is safe to run at any time. It only removes files that are no longer referenced in the manifest.
+</Note>
+
+## Global Manifest Location
+
+The global manifest is stored at:
+- Linux/macOS: `~/.pixi/manifests/pixi-global.toml`
+- Windows: `%USERPROFILE%\.pixi\manifests\pixi-global.toml`
+
+## Complete Workflow
+
+```bash
+# Install some packages
+pixi global install python jupyter
+
+# Make manual changes
+pixi global remove --environment python pip
+
+# Something went wrong, environments out of sync
+pixi global list
+# Warning: environments not in sync
+
+# Sync everything
+pixi global sync
+
+# Verify
+pixi global list
+# Everything is now in sync
+```
+
+<Tip>
+  Run `pixi global sync` regularly to keep your global installation clean and consistent.
+</Tip>
+
+## Differences from Other Commands
+
+| Command | Purpose |
+|---------|--------|
+| `pixi global sync` | Synchronize all environments |
+| `pixi global install` | Install new packages |
+| `pixi global remove` | Remove packages from an environment |
+| `pixi global uninstall` | Remove entire environments |
+
+## Automatic Syncing
+
+Pixi automatically syncs during:
+- `pixi global install`
+- `pixi global remove`
+- `pixi global uninstall`
+
+You typically only need to run `pixi global sync` manually when:
+- Fixing issues
+- After manual changes
+- When explicitly warned by pixi

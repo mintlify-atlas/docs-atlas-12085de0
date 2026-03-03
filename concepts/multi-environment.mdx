@@ -1,0 +1,544 @@
+---
+title: Multiple Environments
+description: Managing multiple environments in a single Pixi workspace
+---
+
+Pixi supports multiple environments within a single workspace, allowing you to manage different dependency sets, Python versions, and system requirements in one project. This is powerful for testing, development, and production scenarios.
+
+## Why Multiple Environments?
+
+Multiple environments solve many real-world scenarios:
+
+<Accordion title="Testing Multiple Package Versions">
+Test your code against different versions:
+```toml
+[feature.py39.dependencies]
+python = "3.9.*"
+
+[feature.py310.dependencies]
+python = "3.10.*"
+
+[feature.py311.dependencies]
+python = "3.11.*"
+
+[environments]
+py39 = ["py39"]
+py310 = ["py310"]
+py311 = ["py311"]
+```
+</Accordion>
+
+<Accordion title="Smaller Single-Purpose Environments">
+Create focused environments for specific tasks:
+```toml
+[feature.lint.dependencies]
+ruff = "*"
+pylint = "*"
+
+[feature.docs.dependencies]
+sphinx = "*"
+sphinx-rtd-theme = "*"
+
+[environments]
+lint = { features = ["lint"], no-default-feature = true }
+docs = { features = ["docs"], no-default-feature = true }
+```
+</Accordion>
+
+<Accordion title="Large Combined Development Environment">
+Combine multiple features into one development environment:
+```toml
+[environments]
+dev = ["test", "lint", "docs", "build"]
+```
+</Accordion>
+
+<Accordion title="Testing Production Environment">
+Test production with additional dependencies:
+```toml
+[environments]
+prod = { features = [], solve-group = "prod-group" }
+test-prod = { features = ["test"], solve-group = "prod-group" }
+# Both environments solve together, ensuring test-prod uses
+# the exact same package versions as prod
+```
+</Accordion>
+
+<Accordion title="Multiple System Requirements">
+Support different hardware in one workspace:
+```toml
+[feature.cuda.system-requirements]
+cuda = "12.1"
+
+[feature.cpu]
+# No special requirements
+
+[environments]
+cuda = ["cuda"]
+cpu = ["cpu"]
+```
+</Accordion>
+
+## Features and Environments
+
+Pixi uses **features** to define environment components. Features can specify:
+
+- `dependencies` - Conda packages
+- `pypi-dependencies` - PyPI packages
+- `system-requirements` - System specifications
+- `activation` - Activation scripts and env vars
+- `platforms` - Supported platforms
+- `channels` - Package channels (with priority)
+- `target` - Platform-specific configuration
+- `tasks` - Feature-specific tasks
+
+### The Default Feature
+
+All base configuration is part of the `default` feature:
+
+```toml
+# These are shorthand for [feature.default.*]
+[dependencies]
+python = "*"
+numpy = ">=1.21"
+
+[pypi-dependencies]
+pandas = "*"
+
+[system-requirements]
+libc = "2.33"
+
+[activation]
+scripts = ["activate.sh"]
+```
+
+### Defining Features
+
+Create custom features for different purposes:
+
+```toml
+# Testing feature
+[feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+
+[feature.test.tasks]
+test = "pytest"
+
+# Python version features
+[feature.py39.dependencies]
+python = "~=3.9.0"
+
+[feature.py310.dependencies]
+python = "~=3.10.0"
+
+# CUDA feature
+[feature.cuda]
+platforms = ["linux-64"]
+system-requirements = { cuda = "12.1" }
+dependencies = { cuda = "12.1", cudnn = "8.*" }
+pypi-dependencies = { torch = "2.0.0+cu121" }
+activation = { scripts = ["cuda_setup.sh"] }
+channels = ["nvidia", { channel = "pytorch", priority = -1 }]
+tasks = { warmup = "python warmup_gpu.py" }
+
+# Platform-specific configuration within feature
+[feature.cuda.target.linux-64]
+dependencies = { cuda-toolkit = "12.1" }
+```
+
+<Info>
+Channels in features **concatenate** using priority (higher priority comes first). Default channels are still used.
+</Info>
+
+## Creating Environments
+
+Combine features to create environments:
+
+```toml
+[environments]
+# Implicit: default = ["default"]
+# You can omit this line - the default environment always includes the default feature
+
+# Single feature (plus default)
+py310 = ["py310"]  # Equivalent to: ["py310", "default"]
+
+# Multiple features
+test = ["test", "py310"]  # Equivalent to: ["test", "py310", "default"]
+
+# Without default feature
+lint = { features = ["lint"], no-default-feature = true }
+```
+
+<Note>
+The `default` feature is automatically included unless you set `no-default-feature = true`.
+</Note>
+
+### Environment Without Default
+
+Create isolated environments that don't include base dependencies:
+
+```toml
+[dependencies]
+python = "*"
+numpy = "*"
+
+[feature.lint.dependencies]
+pre-commit = "*"
+
+[environments]
+# This environment only has pre-commit, not numpy
+lint = { features = ["lint"], no-default-feature = true }
+```
+
+## Solve Groups
+
+Solve groups ensure multiple environments share compatible package versions:
+
+```toml
+[dependencies]
+python = ">=3.8"
+pytest = "*"
+
+[feature.test.dependencies]
+pytest-cov = "*"
+
+[environments]
+# Both environments solve together
+prod = { features = [], solve-group = "prod-group" }
+test-prod = { features = ["test"], solve-group = "prod-group" }
+```
+
+<Tip>
+Use solve groups when you want to test a production environment with additional dependencies but ensure package versions remain identical.
+</Tip>
+
+## Using Environments
+
+### Default Environment
+
+```bash
+# Uses the 'default' environment
+pixi run python
+pixi shell
+pixi install
+```
+
+### Specific Environment
+
+```bash
+# Run command in specific environment
+pixi run -e test pytest
+pixi run --environment test pytest
+
+# Start shell in specific environment
+pixi shell -e cuda
+pixi shell --environment cuda
+
+# Install specific environment
+pixi install -e test
+```
+
+### Default Environment for Tasks
+
+Set which environment runs a task by default:
+
+```toml
+[feature.test.tasks]
+test = "pytest"
+
+[tasks]
+test-all = { cmd = "pytest --verbose", default-environment = "test" }
+
+[environments]
+test = ["test"]
+```
+
+```bash
+# Runs in test environment
+pixi run test-all
+
+# Override default
+pixi run -e other test-all
+```
+
+## Ambiguous Task Selection
+
+When a task exists in multiple environments, Pixi prompts for selection:
+
+```toml
+[tasks]
+ambi = "echo Ambi::Default"
+
+[feature.test.tasks]
+test = "echo Test"
+ambi = "echo Ambi::Test"
+
+[feature.dev.tasks]
+dev = "echo Dev"
+ambi = "echo Ambi::Dev"
+
+[environments]
+default = ["test", "dev"]
+test = ["test"]
+dev = ["dev"]
+```
+
+```bash
+pixi run ambi
+# ? The task 'ambi' can be run in multiple environments.
+# Please select an environment to run the task in: ›
+# ❯ default
+#   test
+#   dev
+```
+
+<Info>
+Tasks defined in features override tasks in the default environment.
+</Info>
+
+## Lock File Structure
+
+The lock file tracks which environments use which packages:
+
+```yaml
+- platform: linux-64
+  name: python
+  version: 3.11.0
+  environments:
+    - default
+    - test
+    - py311
+    - dev
+
+- platform: linux-64
+  name: pytest
+  version: 7.4.0
+  environments:
+    - test
+    - dev
+```
+
+<Tip>
+Packages can list multiple environments, keeping the lock file minimal.
+</Tip>
+
+## Real-World Examples
+
+### Python Version Matrix Testing
+
+```toml
+[workspace]
+name = "my-library"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64", "win-64"]
+
+[dependencies]
+pip = "*"
+
+[tasks]
+test = "pytest"
+
+[feature.py39.dependencies]
+python = "3.9.*"
+
+[feature.py310.dependencies]
+python = "3.10.*"
+
+[feature.py311.dependencies]
+python = "3.11.*"
+
+[feature.py312.dependencies]
+python = "3.12.*"
+
+[feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+
+[environments]
+py39 = ["py39", "test"]
+py310 = ["py310", "test"]
+py311 = ["py311", "test"]
+py312 = ["py312", "test"]
+```
+
+CI configuration:
+
+```yaml
+# .github/workflows/test.yml
+jobs:
+  test:
+    strategy:
+      matrix:
+        environment: [py39, py310, py311, py312]
+    steps:
+      - uses: prefix-dev/setup-pixi@v0.5.1
+        with:
+          environments: ${{ matrix.environment }}
+      - run: pixi run -e ${{ matrix.environment }} test
+```
+
+### Production vs Testing
+
+```toml
+[workspace]
+name = "my-app"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = ">=3.11"
+fastapi = ">=0.105.0"
+sqlalchemy = ">=2,<3"
+uvicorn = "*"
+
+[tasks]
+serve = "uvicorn my_app.app:main"
+
+[feature.test.dependencies]
+pytest = "*"
+pytest-asyncio = "*"
+
+[feature.test.tasks]
+test = "pytest --verbose"
+
+[environments]
+# Share versions between prod and test
+prod = { features = [], solve-group = "prod-group" }
+test = { features = ["test"], solve-group = "prod-group" }
+```
+
+Usage:
+
+```bash
+# In CI
+pixi run -e test test
+
+# In Docker
+pixi run -e prod serve
+```
+
+### Multi-Hardware Support
+
+From the `multi-machine` example:
+
+```toml
+[workspace]
+name = "ml-training"
+channels = ["conda-forge", "pytorch", "nvidia"]
+platforms = ["linux-64", "osx-arm64"]
+
+[dependencies]
+python = "3.11.*"
+pytorch = { version = ">=2.0.1", channel = "pytorch" }
+
+[tasks]
+train = "python train.py"
+
+[feature.cuda]
+platforms = ["linux-64"]
+channels = ["nvidia", { channel = "pytorch", priority = -1 }]
+system-requirements = { cuda = "12.1" }
+
+[feature.cuda.dependencies]
+pytorch-cuda = { version = "12.1.*", channel = "pytorch" }
+
+[feature.cuda.tasks]
+train = "python train.py --cuda"
+
+[feature.mlx]
+platforms = ["osx-arm64"]
+system-requirements = { macos = "13.5" }
+
+[feature.mlx.dependencies]
+mlx = ">=0.16.1"
+
+[feature.mlx.tasks]
+train = "python train.py --mlx"
+
+[environments]
+cuda = ["cuda"]
+mlx = ["mlx"]
+```
+
+```bash
+# On Linux with CUDA
+pixi run -e cuda train
+
+# On macOS with Apple Silicon
+pixi run -e mlx train
+```
+
+### Package Version Testing
+
+```toml
+[workspace]
+name = "polarify"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+[dependencies]
+python = ">=3.9"
+pip = "*"
+
+[feature.pl017.dependencies]
+polars = "0.17.*"
+
+[feature.pl018.dependencies]
+polars = "0.18.*"
+
+[feature.pl019.dependencies]
+polars = "0.19.*"
+
+[feature.pl020.dependencies]
+polars = "0.20.*"
+
+[feature.test.dependencies]
+pytest = "*"
+
+[feature.test.tasks]
+test = "pytest"
+
+[environments]
+pl017 = ["pl017", "test"]
+pl018 = ["pl018", "test"]
+pl019 = ["pl019", "test"]
+pl020 = ["pl020", "test"]
+```
+
+## Best Practices
+
+**Keep Features Focused**
+```toml
+# Good: Clear single purpose
+[feature.test.dependencies]
+pytest = "*"
+
+# Good: Specific Python version
+[feature.py311.dependencies]
+python = "3.11.*"
+```
+
+**Use Solve Groups for Production**
+```toml
+[environments]
+prod = { solve-group = "prod" }
+test-prod = { features = ["test"], solve-group = "prod" }
+```
+
+**Document Environment Purpose**
+```toml
+# README.md or comments in pixi.toml
+# - default: Development with all tools
+# - test: Testing environment
+# - prod: Production deployment
+# - lint: Code quality checks only
+```
+
+**Use no-default-feature for Tools**
+```toml
+# Lightweight tool environments
+[environments]
+lint = { features = ["lint"], no-default-feature = true }
+docs = { features = ["docs"], no-default-feature = true }
+```

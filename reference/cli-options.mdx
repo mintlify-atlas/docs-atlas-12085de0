@@ -1,0 +1,328 @@
+---
+title: Global CLI Options
+description: Command-line options available across all pixi commands
+---
+
+Pixi provides several global options that can be used with any command. These options control logging, output formatting, and other cross-cutting concerns.
+
+## Global Options
+
+### `--help`
+
+<ParamField path="--help" type="boolean">
+  Display help information for the command.
+  
+  **Aliases:** `-h`
+  
+  ```bash
+  pixi --help
+  pixi add --help
+  pixi run --help
+  ```
+</ParamField>
+
+### `--verbose`
+
+<ParamField path="--verbose" type="count">
+  Increase logging verbosity. Can be specified multiple times for more detail.
+  
+  **Aliases:** `-v`
+  
+  **Levels:**
+  - `-v` - Show warnings
+  - `-vv` - Show info messages
+  - `-vvv` - Show debug messages
+  - `-vvvv` - Show trace messages
+  
+  ```bash
+  pixi install -v          # Show warnings
+  pixi install -vv         # Show info
+  pixi install -vvv        # Show debug
+  pixi install -vvvv       # Show trace (everything)
+  ```
+</ParamField>
+
+### `--quiet`
+
+<ParamField path="--quiet" type="count">
+  Decrease logging verbosity (quiet mode). Suppresses all output except errors.
+  
+  **Aliases:** `-q`
+  
+  ```bash
+  pixi install --quiet
+  pixi install -q
+  ```
+  
+  <Note>
+    `--quiet` overrides `--verbose` if both are specified.
+  </Note>
+</ParamField>
+
+### `--color`
+
+<ParamField path="--color" type="enum" default="auto">
+  Control colored output in the terminal.
+  
+  **Values:**
+  - `auto` - Automatically detect if colors are supported
+  - `always` - Always use colors
+  - `never` - Never use colors
+  
+  **Environment variable:** `PIXI_COLOR`
+  
+  ```bash
+  pixi install --color never
+  pixi list --color always
+  ```
+</ParamField>
+
+### `--no-progress`
+
+<ParamField path="--no-progress" type="boolean" default="false">
+  Hide all progress bars. Automatically enabled if stderr is not a terminal.
+  
+  **Environment variable:** `PIXI_NO_PROGRESS`
+  
+  ```bash
+  pixi install --no-progress
+  ```
+  
+  Useful in CI/CD environments:
+  ```bash
+  # GitHub Actions
+  pixi install --no-progress
+  ```
+</ParamField>
+
+## Configuration Options
+
+These options are available on commands that work with workspaces.
+
+### `--manifest-path`
+
+<ParamField path="--manifest-path" type="path">
+  The path to `pixi.toml`, `pyproject.toml`, or the workspace directory.
+  
+  ```bash
+  pixi install --manifest-path /path/to/pixi.toml
+  pixi add numpy --manifest-path ./my-workspace
+  ```
+  
+  <Tip>
+    If not specified, pixi searches for a manifest file in the current directory and parent directories.
+  </Tip>
+</ParamField>
+
+## Lock File Options
+
+These options control how pixi interacts with the lock file.
+
+### `--frozen`
+
+<ParamField path="--frozen" type="boolean">
+  Install the environment as defined in the lockfile without updating it.
+  
+  **Environment variable:** `PIXI_FROZEN`
+  
+  ```bash
+  pixi install --frozen
+  pixi run --frozen test
+  ```
+  
+  Use cases:
+  - **CI/CD**: Ensure reproducible builds
+  - **Production**: Deploy exact versions from lock file
+  - **Offline**: Install without network access (if cache is populated)
+</ParamField>
+
+### `--locked`
+
+<ParamField path="--locked" type="boolean">
+  Check if lockfile is up-to-date before installing. Aborts if lockfile is outdated.
+  
+  **Environment variable:** `PIXI_LOCKED`
+  
+  ```bash
+  pixi install --locked
+  pixi run --locked test
+  ```
+  
+  Use cases:
+  - **CI/CD**: Fail if dependencies have changed
+  - **Team development**: Enforce lock file updates before running
+  - **Validation**: Verify lock file matches manifest
+</ParamField>
+
+## Differences: `--frozen` vs `--locked`
+
+<Accordion title="--frozen">
+  **Behavior:** Uses the existing lock file without updating it.
+  
+  **When to use:**
+  - Production deployments
+  - CI/CD pipelines
+  - When you want exact reproducibility
+  
+  **Effect:**
+  - Lock file is never updated
+  - Installs proceed even if manifest has changed
+  - Fast: skips dependency resolution
+  
+  ```bash
+  # CI/CD example
+  pixi install --frozen
+  pixi run --frozen test
+  ```
+</Accordion>
+
+<Accordion title="--locked">
+  **Behavior:** Checks if lock file is up-to-date with manifest, fails if not.
+  
+  **When to use:**
+  - Catching uncommitted dependency changes
+  - Enforcing lock file discipline
+  - Pre-commit checks
+  
+  **Effect:**
+  - Lock file is never updated
+  - **Fails** if manifest has changed since lock file was generated
+  - Ensures lock file matches manifest
+  
+  ```bash
+  # Pre-commit hook example
+  pixi install --locked || {
+    echo "Lock file is out of date!"
+    echo "Run: pixi install"
+    exit 1
+  }
+  ```
+</Accordion>
+
+<Accordion title="Neither (default)">
+  **Behavior:** Updates lock file if needed, then installs.
+  
+  **When to use:**
+  - Local development
+  - After adding/removing dependencies
+  - Normal workflow
+  
+  **Effect:**
+  - Lock file is updated if manifest changed
+  - Always installs latest compatible versions
+  
+  ```bash
+  # Development workflow
+  pixi add numpy
+  pixi install  # Updates lock file
+  ```
+</Accordion>
+
+## Examples
+
+### Basic usage
+
+```bash
+# Verbose installation
+pixi install -vv
+
+# Quiet mode (only errors)
+pixi run -q test
+
+# No colors in CI
+pixi list --color never
+```
+
+### CI/CD configuration
+
+```bash
+#!/bin/bash
+# Typical CI setup
+
+pixi install \
+  --frozen \
+  --no-progress \
+  --color never \
+  --quiet
+
+pixi run --frozen test
+```
+
+### Development workflow
+
+```bash
+# Check if lock file is up-to-date
+pixi install --locked
+
+# If outdated, update it
+if [ $? -ne 0 ]; then
+  pixi install
+  git add pixi.lock
+  git commit -m "Update lock file"
+fi
+```
+
+### Custom manifest location
+
+```bash
+# Work with multiple workspaces
+pixi install --manifest-path ./workspace-a/pixi.toml
+pixi install --manifest-path ./workspace-b/pixi.toml
+
+# Run task from specific workspace
+pixi run --manifest-path ./api/pixi.toml test
+```
+
+### Debugging
+
+```bash
+# Maximum verbosity
+pixi install -vvvv
+
+# With Rust logging
+RUST_LOG=debug pixi install -vvv
+
+# With backtraces
+RUST_BACKTRACE=1 pixi run test
+```
+
+## Combining Options
+
+Global options can be combined:
+
+```bash
+# Frozen install with progress bars hidden
+pixi install --frozen --no-progress
+
+# Verbose locked check with no colors
+pixi install --locked -vv --color never
+
+# Quiet frozen run
+pixi run --frozen --quiet test
+```
+
+## Option Precedence
+
+When the same setting is specified multiple ways, pixi uses this precedence (highest to lowest):
+
+1. **Command-line flags** (e.g., `--frozen`)
+2. **Environment variables** (e.g., `PIXI_FROZEN=true`)
+3. **Configuration file** (e.g., `config.toml`)
+4. **Defaults**
+
+Example:
+```bash
+# CLI flag overrides environment
+export PIXI_FROZEN=false
+pixi install --frozen  # Uses frozen mode
+
+# Environment variable used if no flag
+export PIXI_FROZEN=true
+pixi install  # Uses frozen mode
+```
+
+## Related
+
+- [Environment Variables](/reference/environment-variables) - Environment variable configuration
+- [Configuration File](/reference/configuration) - File-based configuration
+- [Commands(/commands/init) - Command-specific options

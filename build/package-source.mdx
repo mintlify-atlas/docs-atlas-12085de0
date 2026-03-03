@@ -1,0 +1,572 @@
+---
+title: Package Source Configuration
+description: Configure where your package source code is located
+---
+
+Learn how to specify package source locations using paths, git repositories, or URLs.
+
+## Default Behavior
+
+By default, build backends look for source code in the directory containing the package manifest:
+
+```text
+my_package/
+├── pixi.toml          # Package manifest
+├── src/               # Source code here
+│   └── my_code.cpp
+└── include/
+    └── my_code.h
+```
+
+Build backends have reasonable defaults:
+- `pixi-build-cmake` looks for `CMakeLists.txt` in the package directory
+- `pixi-build-python` looks for `pyproject.toml` or `setup.py` in the package directory
+- `pixi-build-rust` looks for `Cargo.toml` in the package directory
+
+<Note>
+The exception is `pixi-build-rattler-build`, where you specify the source directly in `recipe.yaml`.
+</Note>
+
+## Using a Custom Path
+
+If your source is in a different location, use `package.build.source.path`:
+
+### Subdirectory
+
+```text
+my_package/
+├── pixi.toml
+└── source/            # Source in subdirectory
+    ├── src/
+    │   └── my_code.cpp
+    └── include/
+        └── my_code.h
+```
+
+```toml title="pixi.toml"
+[package.build.source]
+path = "source"
+```
+
+### Relative Path
+
+Source can be outside the package directory:
+
+```text
+workspace/
+├── packages/
+│   └── my_package/
+│       └── pixi.toml
+└── shared_source/     # Shared source code
+    └── src/
+```
+
+```toml title="packages/my_package/pixi.toml"
+[package.build.source]
+path = "../../shared_source"
+```
+
+<Note>
+Relative paths are resolved from the package manifest location.
+</Note>
+
+### Git Submodules
+
+This works great with git submodules:
+
+```bash
+git submodule add https://github.com/user/library.git external/library
+```
+
+```toml title="pixi.toml"
+[package.build.source]
+path = "external/library"
+```
+
+## Using Git Repositories
+
+Build directly from git repositories:
+
+### Basic Git Source
+
+```toml title="pixi.toml"
+[package.build.source]
+git = "https://github.com/user/repo.git"
+```
+
+Pixi clones the repository and builds from it.
+
+### Pinning to a Branch
+
+```toml title="pixi.toml"
+[package.build.source]
+git = "https://github.com/user/repo.git"
+branch = "main"
+```
+
+Always builds from the latest commit on the specified branch.
+
+<Warning>
+Using branches creates non-reproducible builds. Prefer tags or revisions for production.
+</Warning>
+
+### Pinning to a Tag
+
+```toml title="pixi.toml"
+[package.build.source]
+git = "https://github.com/user/repo.git"
+tag = "v1.0.0"
+```
+
+Builds from a specific release tag - recommended for reproducibility.
+
+### Pinning to a Commit
+
+```toml title="pixi.toml"
+[package.build.source]
+git = "https://github.com/user/repo.git"
+rev = "abc123def456"
+```
+
+Builds from an exact commit hash - most reproducible option.
+
+### Git Subdirectory
+
+If the package is in a subdirectory of the repository:
+
+```toml title="pixi.toml"
+[package.build.source]
+git = "https://github.com/user/repo.git"
+tag = "v1.0.0"
+subdirectory = "packages/mypackage"
+```
+
+Common in monorepos:
+
+```text
+repo/
+├── packages/
+│   ├── package-a/
+│   │   └── pixi.toml
+│   └── package-b/
+│       └── pixi.toml
+└── README.md
+```
+
+## Complete Examples
+
+### SDL Example from Git
+
+```toml title="pixi.toml"
+[package.build.source]
+git = "https://github.com/prefix-dev/pixi-build-testsuite.git"
+subdirectory = "tests/data/pixi_build/cpp-with-path-to-source/project"
+
+[package.build.backend]
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+name = "pixi-build-cmake"
+version = "*"
+
+[package]
+name = "sdl_example"
+version = "0.1.0"
+
+[package.host-dependencies]
+sdl2 = ">=2.26.5,<3.0"
+
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["osx-arm64", "linux-64", "win-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+sdl_example = { path = "." }
+```
+
+### Python Package with Custom Path
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+my_package = { path = "." }
+
+[package]
+name = "my_package"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+
+[package.build.source]
+path = "python_src"  # Source in python_src/ subdirectory
+
+[package.host-dependencies]
+hatchling = "*"
+
+[package.run-dependencies]
+rich = "*"
+```
+
+### Multiple Packages from Different Sources
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64", "osx-64", "win-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+local_pkg = { path = "." }              # (1)!
+vendor_lib = { path = "packages/vendor" } # (2)!
+upstream = { path = "packages/upstream" } # (3)!
+```
+
+1. Local package in root directory
+2. Vendored third-party library
+3. Upstream package with custom source configuration
+
+```toml title="packages/upstream/pixi.toml"
+[package]
+name = "upstream"
+version = "2.5.0"
+
+[package.build]
+backend = { name = "pixi-build-cmake", version = "0.3.*" }
+
+[package.build.source]
+git = "https://github.com/upstream/project.git"
+tag = "v2.5.0"
+```
+
+## Source Configuration Patterns
+
+<CodeGroup>
+
+```toml Local Development
+# Default - source in same directory as pixi.toml
+# No [package.build.source] needed
+```
+
+```toml Subdirectory
+[package.build.source]
+path = "src"
+```
+
+```toml Git Main Branch
+[package.build.source]
+git = "https://github.com/user/repo.git"
+branch = "main"
+```
+
+```toml Git Release
+[package.build.source]
+git = "https://github.com/user/repo.git"
+tag = "v1.2.3"
+```
+
+```toml Git Commit
+[package.build.source]
+git = "https://github.com/user/repo.git"
+rev = "a1b2c3d4"
+```
+
+```toml Monorepo
+[package.build.source]
+git = "https://github.com/org/monorepo.git"
+tag = "v2.0.0"
+subdirectory = "packages/mypackage"
+```
+
+</CodeGroup>
+
+## Use Cases
+
+<AccordionGroup>
+
+<Accordion title="Depending on unreleased changes">
+Use a git branch to depend on development versions:
+
+```toml
+[package.build.source]
+git = "https://github.com/user/library.git"
+branch = "feature/new-api"
+```
+
+Useful for:
+- Testing unreleased features
+- Contributing to upstream projects
+- Coordinating changes across projects
+</Accordion>
+
+<Accordion title="Pinning to specific versions">
+Use tags for reproducible builds:
+
+```toml
+[package.build.source]
+git = "https://github.com/user/library.git"
+tag = "v1.2.3"
+```
+
+Best for:
+- Production deployments
+- Published packages
+- Reproducible research
+</Accordion>
+
+<Accordion title="Monorepo packages">
+Build multiple packages from one repository:
+
+```toml
+# Package A
+[package.build.source]
+git = "https://github.com/org/monorepo.git"
+subdirectory = "packages/package-a"
+
+# Package B
+[package.build.source]
+git = "https://github.com/org/monorepo.git"
+subdirectory = "packages/package-b"
+```
+</Accordion>
+
+<Accordion title="Vendoring dependencies">
+Keep third-party sources in your repository:
+
+```bash
+# Add as git submodule
+git submodule add https://github.com/vendor/lib.git vendor/lib
+```
+
+```toml
+[package.build.source]
+path = "vendor/lib"
+```
+</Accordion>
+
+<Accordion title="Separate source and build configs">
+Keep build configuration separate from source:
+
+```text
+project/
+├── build-configs/
+│   └── pixi.toml          # Build config
+└── src/                     # Source code
+```
+
+```toml
+[package.build.source]
+path = "../src"
+```
+</Accordion>
+
+</AccordionGroup>
+
+## Authentication for Private Repositories
+
+For private git repositories, use SSH or credentials:
+
+### SSH Keys
+
+```toml
+[package.build.source]
+git = "git@github.com:user/private-repo.git"
+tag = "v1.0.0"
+```
+
+Ensure your SSH keys are configured:
+
+```bash
+ssh-add ~/.ssh/id_rsa
+```
+
+### Git Credentials
+
+Configure git credentials manager:
+
+```bash
+git config --global credential.helper store
+```
+
+Then use HTTPS URLs:
+
+```toml
+[package.build.source]
+git = "https://github.com/user/private-repo.git"
+```
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Prefer tags over branches">
+For reproducibility:
+
+```toml
+# Good - reproducible
+[package.build.source]
+git = "https://github.com/user/repo.git"
+tag = "v1.0.0"
+
+# Risky - changes over time
+[package.build.source]
+git = "https://github.com/user/repo.git"
+branch = "main"
+```
+</Accordion>
+
+<Accordion title="Document source choices">
+Comment why you're using a specific source:
+
+```toml
+# Using development branch until PR #123 is merged
+[package.build.source]
+git = "https://github.com/user/repo.git"
+branch = "fix/critical-bug"
+```
+</Accordion>
+
+<Accordion title="Keep source close to config">
+When possible, keep source and config together:
+
+```text
+package/
+├── pixi.toml
+└── src/
+```
+
+Rather than:
+
+```text
+project/
+├── configs/pixi.toml
+└── sources/my_pkg/
+```
+</Accordion>
+
+<Accordion title="Use submodules for vendored deps">
+For vendored dependencies:
+
+```bash
+git submodule add https://github.com/vendor/lib.git vendor/lib
+```
+
+Better than copying source directly.
+</Accordion>
+
+</AccordionGroup>
+
+## Source Configuration Reference
+
+### Path Source
+
+```toml
+[package.build.source]
+path = "relative/or/absolute/path"
+```
+
+- **Relative paths**: From package manifest location
+- **Absolute paths**: Full system paths (not recommended)
+- **Works with**: All backends
+
+### Git Source
+
+```toml
+[package.build.source]
+git = "https://github.com/user/repo.git"  # Required
+branch = "main"                           # Optional
+tag = "v1.0.0"                            # Optional (prefer over branch)
+rev = "abc123"                            # Optional (most specific)
+subdirectory = "path/in/repo"            # Optional
+```
+
+- **git**: Repository URL (HTTPS or SSH)
+- **branch**: Branch name (changes over time)
+- **tag**: Tag name (stable, recommended)
+- **rev**: Commit hash (most specific)
+- **subdirectory**: Path within repository
+
+<Note>
+Only one of `branch`, `tag`, or `rev` can be specified. If none is given, uses the default branch.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Workspaces" icon="folder-tree" href="./workspace">
+Manage multiple packages with different sources
+</Card>
+
+<Card title="Build Backends" icon="gears" href="./backends">
+How backends locate and use source code
+</Card>
+
+<Card title="Getting Started" icon="rocket" href="./getting-started">
+Complete build configuration guide
+</Card>
+
+<Card title="C++ Packages" icon="cpp" href="./cpp-package">
+Building C++ from custom sources
+</Card>
+
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Source not found">
+Verify the path is correct relative to the manifest:
+
+```bash
+ls -la path/to/source  # From manifest directory
+```
+
+```toml
+[package.build.source]
+path = "./correct/relative/path"
+```
+</Accordion>
+
+<Accordion title="Git clone fails">
+Check:
+1. Repository URL is correct
+2. Repository is accessible (public or authenticated)
+3. Branch/tag/revision exists
+
+```bash
+# Test manually
+git clone https://github.com/user/repo.git
+git checkout v1.0.0
+```
+</Accordion>
+
+<Accordion title="Subdirectory not found">
+Ensure the subdirectory exists at the specified location:
+
+```bash
+# Clone and check
+git clone https://github.com/user/repo.git
+ls -la repo/packages/mypackage
+```
+
+```toml
+[package.build.source]
+git = "https://github.com/user/repo.git"
+subdirectory = "packages/mypackage"  # Must exist!
+```
+</Accordion>
+
+<Accordion title="Build can't find source files">
+Backends look for specific files:
+- **cmake**: `CMakeLists.txt`
+- **python**: `pyproject.toml` or `setup.py`
+- **rust**: `Cargo.toml`
+
+Ensure these exist in the source location.
+</Accordion>

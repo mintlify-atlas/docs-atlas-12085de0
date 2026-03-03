@@ -1,0 +1,273 @@
+---
+title: PyPI Resolution Settings
+description: Configure PyPI package resolution and registry access
+---
+
+Pixi uses `uv` under the hood for PyPI package resolution. Configure PyPI-specific settings to control index URLs, keyring access, and secure connections.
+
+## PyPI Configuration
+
+### index-url
+
+Set the default PyPI index URL for new projects.
+
+<ParamField path="pypi-config.index-url" type="string">
+  Default PyPI index URL added to manifest on `pixi init`
+</ParamField>
+
+```toml
+[pypi-config]
+index-url = "https://pypi.org/simple"
+```
+
+<Note>
+  Unlike pip, `index-url` is **not** a global setting. It only modifies the `pixi.toml`/`pyproject.toml` file during initialization. This ensures manifest files remain complete and reproducible.
+</Note>
+
+### extra-index-urls
+
+Additional PyPI indexes to check for packages.
+
+<ParamField path="pypi-config.extra-index-urls" type="array">
+  List of additional index URLs added to manifest on `pixi init`
+</ParamField>
+
+```toml
+[pypi-config]
+extra-index-urls = [
+  "https://pypi.company.com/simple",
+  "https://custom.pypi.org/simple"
+]
+```
+
+### Example: Custom PyPI Mirror
+
+```toml
+[pypi-config]
+index-url = "https://pypi.company.com/simple"
+extra-index-urls = [
+  "https://pypi.org/simple"  # Fallback to public PyPI
+]
+```
+
+## Keyring Integration
+
+Use the Python `keyring` package to store and retrieve PyPI credentials.
+
+<ParamField path="pypi-config.keyring-provider" type="enum">
+  Available options:
+  - `disabled`: Don't use keyring (default)
+  - `subprocess`: Use keyring via subprocess
+</ParamField>
+
+```toml
+[pypi-config]
+keyring-provider = "subprocess"
+```
+
+<Note>
+  This is the **only** pypi-config setting that acts globally. Other settings only affect manifest initialization.
+</Note>
+
+### How Keyring Works
+
+1. Pixi invokes the `keyring` command-line tool
+2. Keyring looks up credentials for the PyPI host
+3. Credentials are passed to `uv` for authentication
+
+### Requirements
+
+- Python `keyring` package must be installed
+- Keyring CLI must be in PATH
+- Credentials must be stored in the system keyring
+
+Store credentials:
+
+```bash
+pip install keyring
+keyring set https://pypi.org/simple __token__
+# Enter your PyPI token when prompted
+```
+
+## TLS and Security
+
+### allow-insecure-host
+
+Disable TLS certificate verification for specific PyPI hosts.
+
+<ParamField path="pypi-config.allow-insecure-host" type="array">
+  List of hostnames (without protocol or port) to skip TLS verification
+</ParamField>
+
+```toml
+[pypi-config]
+allow-insecure-host = [
+  "pypi.internal.company.com",
+  "packages.local"
+]
+```
+
+<Warning>
+  This disables security for specific hosts. Only use for internal PyPI mirrors with self-signed certificates.
+</Warning>
+
+### Use Case: Internal PyPI with Self-Signed Certificate
+
+```toml
+[pypi-config]
+index-url = "https://pypi.internal.company.com/simple"
+allow-insecure-host = ["pypi.internal.company.com"]
+```
+
+### Global TLS Disable
+
+For disabling TLS globally (affects both conda and PyPI):
+
+```toml
+tls-no-verify = true
+```
+
+This automatically adds PyPI hosts to the trusted list but has limitations with CDN redirects.
+
+## Resolution Behavior
+
+### Index Priority
+
+When multiple indexes are configured:
+
+1. `index-url` is checked first
+2. `extra-index-urls` are checked in order
+3. First match wins
+
+```toml
+[pypi-config]
+index-url = "https://primary.pypi.com/simple"
+extra-index-urls = [
+  "https://secondary.pypi.com/simple",
+  "https://tertiary.pypi.com/simple"
+]
+```
+
+### Version Selection
+
+Pixi uses `uv`'s resolution algorithm:
+
+- Latest compatible version is selected
+- Pre-releases are excluded unless explicitly requested
+- Platform-specific wheels are preferred over sdist
+
+## Complete Configuration Example
+
+```toml
+[pypi-config]
+# Use internal mirror as primary source
+index-url = "https://pypi.company.com/simple"
+
+# Fallback to public PyPI and private registry
+extra-index-urls = [
+  "https://pypi.org/simple",
+  "https://packages.internal.company.com/simple"
+]
+
+# Enable keyring for authentication
+keyring-provider = "subprocess"
+
+# Skip TLS verification for internal hosts
+allow-insecure-host = [
+  "pypi.company.com",
+  "packages.internal.company.com"
+]
+```
+
+## Troubleshooting
+
+### Package Not Found
+
+1. Check if package exists in configured indexes
+2. Verify index URLs are correct and accessible
+3. Ensure authentication is configured if required
+4. Check if extra-index-urls are needed
+
+```bash
+# Test index access
+curl https://pypi.org/simple/numpy/
+```
+
+### Authentication Failures
+
+1. Verify keyring is installed: `keyring --version`
+2. Check credentials are stored: `keyring get https://pypi.org/simple __token__`
+3. Test with inline credentials temporarily:
+
+```toml
+[pypi-config]
+index-url = "https://username:password@pypi.company.com/simple"
+```
+
+### TLS Certificate Errors
+
+Error: `SSL: CERTIFICATE_VERIFY_FAILED`
+
+Solutions:
+
+1. **Preferred**: Add host to `allow-insecure-host`
+2. **Alternative**: Use `tls-no-verify = true` (less secure)
+3. **Best**: Install proper CA certificates and use `tls-root-certs = "native"`
+
+### CDN Redirect Issues
+
+If your PyPI mirror redirects to a CDN:
+
+```toml
+[pypi-config]
+index-url = "https://pypi.mirror.com/simple"
+allow-insecure-host = [
+  "pypi.mirror.com",
+  "cdn.mirror.com"  # Add CDN host explicitly
+]
+```
+
+## Environment Variables
+
+PyPI configuration can also be influenced by environment variables:
+
+- `PIP_INDEX_URL`: Override index URL (pip compatibility)
+- `PIP_EXTRA_INDEX_URL`: Additional indexes (pip compatibility)
+- `UV_INDEX_URL`: UV-specific index URL
+- `PIXI_TLS_ROOT_CERTS`: TLS root certificates setting
+
+## Best Practices
+
+### Production Environments
+
+1. **Use dedicated PyPI mirror** for reliability and speed
+2. **Configure authentication** via keyring, not inline credentials
+3. **Pin index URLs** in manifest for reproducibility
+4. **Test resolution** before deploying
+
+```bash
+pixi install --dry-run
+```
+
+### Corporate Networks
+
+1. **Use internal PyPI mirror** to cache packages
+2. **Configure certificate trust** with `tls-root-certs = "native"`
+3. **Document index configuration** for team members
+4. **Set up fallback indexes** for availability
+
+### CI/CD Pipelines
+
+1. **Use environment variables** for credentials:
+
+```bash
+export UV_INDEX_URL="https://${TOKEN}@pypi.company.com/simple"
+pixi install
+```
+
+2. **Cache packages** to speed up builds
+3. **Use locked dependencies** for reproducibility:
+
+```bash
+pixi install --locked
+```

@@ -1,0 +1,636 @@
+---
+title: Multi-Environment Tutorial
+description: Learn how to create and manage multiple environments in a single Pixi workspace for development, testing, and production.
+---
+
+Learn how to create and manage multiple environments within a single Pixi workspace to handle different use cases like development, testing, and production.
+
+## Why Multiple Environments?
+
+When developing a project, you often need different sets of tools and dependencies:
+
+- **Development**: All tools including linters, formatters, and debuggers
+- **Testing**: Testing frameworks and coverage tools
+- **Production**: Only runtime dependencies for deployment
+- **Documentation**: Tools for generating and building docs
+
+With Pixi's multiple environments, you can define all these in one workspace and switch between them easily.
+
+## Key Concepts
+
+### Features
+
+A **feature** is a collection of:
+- Dependencies
+- Tasks
+- Channels
+- Platform configurations
+
+Features aren't useful on their own - they must be part of an environment.
+
+**Define a feature:**
+
+```toml
+[feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+
+[feature.test.tasks]
+test = "pytest tests/"
+```
+
+### Environments
+
+An **environment** is a collection of features that can be installed and activated.
+
+**Define an environment:**
+
+```toml
+[environments]
+test = { features = ["test"], solve-group = "default" }
+```
+
+### Default Feature
+
+The **default** feature contains top-level dependencies:
+
+```toml
+[dependencies]
+python = ">=3.11"
+numpy = "*"
+```
+
+This is equivalent to:
+
+```toml
+[feature.default.dependencies]
+python = ">=3.11"
+numpy = "*"
+```
+
+The default feature is automatically included in all environments unless you use `no-default-feature = true`.
+
+## Getting Started
+
+<Steps>
+
+### Create a Workspace
+
+Start with a new Pixi workspace:
+
+```bash
+pixi init my-workspace
+cd my-workspace
+pixi add python
+```
+
+**Project structure:**
+
+```
+my-workspace/
+├── .pixi/
+│   └── envs/
+│       └── default/
+├── pixi.lock
+└── pixi.toml
+```
+
+### Add a Feature
+
+Add a test feature with pytest:
+
+```bash
+pixi add --feature test pytest
+```
+
+This adds to `pixi.toml`:
+
+```toml
+[feature.test.dependencies]
+pytest = "*"
+```
+
+### Create an Environment
+
+Create a test environment using the test feature:
+
+```bash
+pixi workspace environment add test --feature test
+```
+
+Result in `pixi.toml`:
+
+```toml
+[environments]
+test = { features = ["test"] }
+```
+
+### Use the Environment
+
+Run commands in the test environment:
+
+```bash
+pixi run --environment test pytest --version
+```
+
+**Expected Output:**
+
+```
+✨ Pixi task (test environment): pytest --version
+pytest 8.3.4
+```
+
+Check the environment structure:
+
+```
+.pixi/
+└── envs/
+    ├── default/
+    └── test/
+```
+
+</Steps>
+
+## Testing Multiple Python Versions
+
+A common use case is testing your code against multiple Python versions.
+
+<Steps>
+
+### Make Python Flexible
+
+Allow any Python version in the default feature:
+
+```bash
+pixi add "python=*"
+```
+
+### Create Version Features
+
+Add features for each Python version:
+
+```bash
+pixi add --feature py311 python=3.11
+pixi add --feature py312 python=3.12
+pixi add --feature py313 python=3.13
+```
+
+### Create Test Environments
+
+Combine Python version features with the test feature:
+
+```bash
+pixi workspace environment add test-py311 --feature py311 --feature test
+pixi workspace environment add test-py312 --feature py312 --feature test
+pixi workspace environment add test-py313 --feature py313 --feature test
+```
+
+Result:
+
+```toml
+[feature.py311.dependencies]
+python = "3.11.*"
+
+[feature.py312.dependencies]
+python = "3.12.*"
+
+[feature.py313.dependencies]
+python = "3.13.*"
+
+[feature.test.dependencies]
+pytest = "*"
+
+[environments]
+test-py311 = { features = ["py311", "test"] }
+test-py312 = { features = ["py312", "test"] }
+test-py313 = { features = ["py313", "test"] }
+```
+
+### Run Tests
+
+Test against all Python versions:
+
+```bash
+pixi run --environment test-py311 pytest
+pixi run --environment test-py312 pytest
+pixi run --environment test-py313 pytest
+```
+
+</Steps>
+
+## Development, Testing, and Production
+
+Create separate environments for different stages:
+
+<Steps>
+
+### Create a Clean Workspace
+
+```bash
+pixi init production-project
+cd production-project
+```
+
+### Add Features
+
+Define dependencies for each stage:
+
+```bash
+# Runtime dependencies (default feature)
+pixi add numpy python
+
+# Development tools
+pixi add --feature dev jupyterlab ruff mypy
+
+# Testing tools
+pixi add --feature test pytest pytest-cov
+```
+
+**Result:**
+
+```toml
+[dependencies]
+python = ">=3.11"
+numpy = "*"
+
+[feature.dev.dependencies]
+jupyterlab = "*"
+ruff = "*"
+mypy = "*"
+
+[feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+```
+
+### Create Environments
+
+Define environments with solve groups for consistency:
+
+```bash
+# Production: only runtime dependencies
+pixi workspace environment add production --solve-group prod
+
+# Test: runtime + testing
+pixi workspace environment add test --feature test --solve-group prod
+
+# Development: runtime + dev + test (default environment)
+pixi workspace environment add default --feature dev --feature test --solve-group prod --force
+```
+
+**Result:**
+
+```toml
+[environments]
+production = { solve-group = "prod" }
+test = { features = ["test"], solve-group = "prod" }
+default = { features = ["dev", "test"], solve-group = "prod" }
+```
+
+### Add Tasks
+
+Define tasks for each environment:
+
+```toml
+[tasks]
+start = "python -m my_app"
+
+[feature.dev.tasks]
+dev = "jupyter lab"
+lint = "ruff check ."
+
+[feature.test.tasks]
+test = "pytest tests/"
+coverage = "pytest --cov=my_app tests/"
+```
+
+### Verify Consistency
+
+Check that all environments use the same versions:
+
+```bash
+pixi list --explicit
+```
+
+**Output:**
+
+```
+Environment: default
+Package     Version  Build               Size      Kind   Source
+jupyterlab  4.3.4    pyhd8ed1ab_0        6.9 MiB   conda  jupyterlab
+numpy       2.2.1    py313ha4a2180_0     6.2 MiB   conda  numpy
+pytest      8.3.4    pyhd8ed1ab_1        253 KiB   conda  pytest
+python      3.13.1   h4f43103_105_cp313  12.3 MiB  conda  python
+ruff        0.8.4    py313h8f79df9_0     8.1 MiB   conda  ruff
+
+Environment: test
+Package  Version  Build               Size      Kind   Source
+numpy    2.2.1    py313ha4a2180_0     6.2 MiB   conda  numpy
+pytest   8.3.4    pyhd8ed1ab_1        253 KiB   conda  pytest
+python   3.13.1   h4f43103_105_cp313  12.3 MiB  conda  python
+
+Environment: production
+Package  Version  Build               Size      Kind   Source
+numpy    2.2.1    py313ha4a2180_0     6.2 MiB   conda  numpy
+python   3.13.1   h4f43103_105_cp313  12.3 MiB  conda  python
+```
+
+Notice all environments use the same Python and numpy versions!
+
+</Steps>
+
+## Solve Groups
+
+**Solve groups** ensure dependency versions are consistent across environments.
+
+### Without Solve Groups
+
+```toml
+[environments]
+default = { features = ["dev"] }
+test = { features = ["test"] }
+```
+
+Environments are solved independently and may have different versions.
+
+### With Solve Groups
+
+```toml
+[environments]
+default = { features = ["dev"], solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
+```
+
+Environments share the same dependency versions, preventing version mismatches between development and testing.
+
+<Tip>
+Use solve groups to ensure your tests run against the same dependency versions as your development environment.
+</Tip>
+
+## Environment Without Default Feature
+
+Sometimes you want an environment without the default dependencies:
+
+```bash
+pixi add --feature docs mkdocs mkdocs-material
+pixi workspace environment add docs --feature docs --no-default-feature
+```
+
+**Result:**
+
+```toml
+[feature.docs.dependencies]
+mkdocs = "*"
+mkdocs-material = "*"
+
+[environments]
+docs = { features = ["docs"], no-default-feature = true }
+```
+
+Verify it doesn't include default dependencies:
+
+```bash
+pixi list --explicit --environment docs
+```
+
+**Output:**
+
+```
+Environment: docs
+Package         Version  Build         Size     Kind   Source
+mkdocs          1.6.1    pyhd8ed1ab_1  3.4 MiB  conda  mkdocs
+mkdocs-material 9.5.47   pyhd8ed1ab_0  5.8 MiB  conda  mkdocs-material
+```
+
+## Feature-Specific Tasks
+
+Tasks can be associated with features:
+
+```toml
+[tasks]
+start = "python -m app"
+
+[feature.test.tasks]
+test = "pytest tests/"
+coverage = "pytest --cov=app tests/"
+
+[feature.docs.tasks]
+docs = "mkdocs serve"
+build-docs = "mkdocs build"
+
+[feature.dev.tasks]
+lint = "ruff check ."
+format = "ruff format ."
+```
+
+Run feature-specific tasks:
+
+```bash
+pixi run test      # Automatically uses test environment
+pixi run docs      # Automatically uses docs environment
+pixi run lint      # Uses default environment (has dev feature)
+```
+
+<Note>
+If a task exists in multiple environments, Pixi will prompt you to choose which one.
+</Note>
+
+## Platform-Specific Environments
+
+Define platform-specific dependencies:
+
+```toml
+[feature.unix.dependencies]
+ncurses = "*"
+
+[feature.unix.target.linux-64.dependencies]
+systemd = "*"
+
+[feature.unix.target.osx-arm64.dependencies]
+darwin = "*"
+
+[environments]
+unix = { features = ["unix"], platforms = ["linux-64", "osx-arm64"] }
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+
+Test multiple environments in parallel:
+
+```yaml
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [test-py311, test-py312, test-py313]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: prefix-dev/setup-pixi@v0
+        with:
+          environments: ${{ matrix.environment }}
+      
+      - name: Run tests
+        run: pixi run -e ${{ matrix.environment }} test
+```
+
+### Docker Builds
+
+Use the production environment in Docker:
+
+```dockerfile
+FROM ghcr.io/prefix-dev/pixi:latest
+
+WORKDIR /app
+COPY . .
+
+RUN pixi install --environment production
+
+CMD ["pixi", "run", "--environment", "production", "start"]
+```
+
+## Complete Example
+
+Here's a complete `pixi.toml` with multiple environments:
+
+```toml
+[workspace]
+name = "my-app"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+# Runtime dependencies
+[dependencies]
+python = ">=3.11"
+numpy = ">=2.0"
+pandas = ">=2.0"
+
+# Development tools
+[feature.dev.dependencies]
+jupyterlab = "*"
+ruff = "*"
+mypy = "*"
+ipython = "*"
+
+[feature.dev.tasks]
+dev = "jupyter lab"
+lint = "ruff check ."
+format = "ruff format ."
+type-check = "mypy src/"
+
+# Testing tools
+[feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+pytest-asyncio = "*"
+
+[feature.test.tasks]
+test = "pytest tests/"
+coverage = "pytest --cov=my_app --cov-report=html tests/"
+test-verbose = "pytest -v tests/"
+
+# Documentation
+[feature.docs.dependencies]
+mkdocs = "*"
+mkdocs-material = "*"
+mkdocstrings = { version = "*", extras = ["python"] }
+
+[feature.docs.tasks]
+docs = "mkdocs serve"
+build-docs = "mkdocs build"
+
+# Python versions
+[feature.py311.dependencies]
+python = "3.11.*"
+
+[feature.py312.dependencies]
+python = "3.12.*"
+
+[feature.py313.dependencies]
+python = "3.13.*"
+
+# Application tasks
+[tasks]
+start = "python -m my_app"
+clean = "find . -type d -name __pycache__ -delete"
+
+# Environments
+[environments]
+# Development environment (default)
+default = { features = ["dev", "test"], solve-group = "default" }
+
+# Testing environments for different Python versions
+test-py311 = { features = ["py311", "test"], solve-group = "test" }
+test-py312 = { features = ["py312", "test"], solve-group = "test" }
+test-py313 = { features = ["py313", "test"], solve-group = "test" }
+
+# Production environment
+production = { solve-group = "default", no-default-feature = false }
+
+# Documentation environment
+docs = { features = ["docs"], no-default-feature = true }
+```
+
+## Best Practices
+
+<Tip>
+**Use solve groups for related environments:**
+Environments that should share versions (like dev and test) should be in the same solve group.
+</Tip>
+
+<Tip>
+**Keep production minimal:**
+The production environment should only include runtime dependencies.
+</Tip>
+
+<Tip>
+**Organize features by purpose:**
+Group related dependencies and tasks into features (dev, test, docs).
+</Tip>
+
+<Tip>
+**Use no-default-feature sparingly:**
+Only use it for truly independent environments like documentation.
+</Tip>
+
+## Troubleshooting
+
+### Tasks Not Found
+
+If a task isn't found, check which environments include its feature:
+
+```bash
+pixi info
+```
+
+### Version Conflicts
+
+If environments have conflicting versions, ensure they're in the same solve group:
+
+```toml
+[environments]
+env1 = { features = ["feat1"], solve-group = "default" }
+env2 = { features = ["feat2"], solve-group = "default" }
+```
+
+### Environment Not Created
+
+Manually install an environment:
+
+```bash
+pixi install --environment test
+```
+
+## Next Steps
+
+- Learn about [importing environments](/tutorials/import-environments) from other formats
+- Explore [Python development](/tutorials/python) workflows
+- Understand [pyproject.toml integration](/tutorials/pyproject-toml)

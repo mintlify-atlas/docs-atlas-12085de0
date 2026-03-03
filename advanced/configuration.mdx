@@ -1,0 +1,258 @@
+---
+title: Global Configuration
+description: Configure pixi globally with config.toml
+---
+
+Pixi supports global configuration options that are not tied to a specific workspace. These settings are local to the machine and loaded from various configuration files.
+
+## Configuration Loading Order
+
+Configuration files are loaded with the following priority (highest to lowest):
+
+<Tabs>
+  <Tab title="Linux">
+    | Priority | Location | Description |
+    |----------|----------|-------------|
+    | 7 | Command line arguments | `--tls-no-verify`, `--change-ps1=false`, etc. |
+    | 6 | `your_project/.pixi/config.toml` | Project-specific configuration |
+    | 5 | `$PIXI_HOME/config.toml` | Global configuration in `PIXI_HOME` |
+    | 4 | `$HOME/.pixi/config.toml` | Global configuration in user home |
+    | 3 | `$XDG_CONFIG_HOME/pixi/config.toml` | XDG compliant user configuration |
+    | 2 | `$HOME/.config/pixi/config.toml` | User-specific configuration |
+    | 1 | `/etc/pixi/config.toml` | System-wide configuration |
+  </Tab>
+  <Tab title="macOS">
+    | Priority | Location | Description |
+    |----------|----------|-------------|
+    | 7 | Command line arguments | `--tls-no-verify`, `--change-ps1=false`, etc. |
+    | 6 | `your_project/.pixi/config.toml` | Project-specific configuration |
+    | 5 | `$PIXI_HOME/config.toml` | Global configuration in `PIXI_HOME` |
+    | 4 | `$HOME/.pixi/config.toml` | Global configuration in user home |
+    | 3 | `$HOME/Library/Application Support/pixi/config.toml` | User-specific configuration |
+    | 2 | `$XDG_CONFIG_HOME/pixi/config.toml` | XDG compliant user configuration |
+    | 1 | `/etc/pixi/config.toml` | System-wide configuration |
+  </Tab>
+  <Tab title="Windows">
+    | Priority | Location | Description |
+    |----------|----------|-------------|
+    | 6 | Command line arguments | `--tls-no-verify`, `--change-ps1=false`, etc. |
+    | 5 | `your_project\.pixi\config.toml` | Project-specific configuration |
+    | 4 | `%PIXI_HOME%\config.toml` | Global configuration in `PIXI_HOME` |
+    | 3 | `%USERPROFILE%\.pixi\config.toml` | Global configuration in user home |
+    | 2 | `%APPDATA%\pixi\config.toml` | User-specific configuration |
+    | 1 | `C:\ProgramData\pixi\config.toml` | System-wide configuration |
+  </Tab>
+</Tabs>
+
+<Note>
+  Higher priority values override lower priority values. To find all locations where pixi looks for configuration files, run `pixi info -vvv`.
+</Note>
+
+## Core Configuration Options
+
+### default-channels
+
+The default channels to use when running `pixi init` or `pixi global install`.
+
+<ParamField path="default-channels" type="array" default="['conda-forge']">
+  Default channels for new projects
+</ParamField>
+
+```toml
+default-channels = ["conda-forge"]
+```
+
+<Note>
+  The `default-channels` are only used when initializing a new workspace. Once initialized, the `channels` from the workspace manifest are used.
+</Note>
+
+### shell
+
+Configure shell behavior when using `pixi shell`.
+
+<ParamField path="shell.change-ps1" type="boolean" default="true">
+  When set to `false`, removes the `(pixi)` prefix from the shell prompt. Override with `--change-ps1`.
+</ParamField>
+
+<ParamField path="shell.force-activate" type="boolean" default="false">
+  When set to `true`, re-activation always happens. Used with experimental `use-environment-activation-cache`.
+</ParamField>
+
+<ParamField path="shell.source-completion-scripts" type="boolean" default="true">
+  When set to `false`, pixi will not source autocompletion scripts when entering the shell.
+</ParamField>
+
+```toml
+[shell]
+change-ps1 = true
+force-activate = false
+source-completion-scripts = true
+```
+
+### pinning-strategy
+
+Strategy for pinning dependencies when running `pixi add`.
+
+<ParamField path="pinning-strategy" type="enum" default="semver">
+  Available strategies:
+  - `no-pin`: No pinning, resulting in `*`
+  - `semver`: Pin to major for most versions, minor for v0 versions
+  - `exact-version`: Pin to exact version `==1.2.3`
+  - `major`: Pin to major `>=1.2.3, <2`
+  - `minor`: Pin to minor `>=1.2.3, <1.3`
+  - `latest-up`: Pin to latest `>=1.2.3`
+</ParamField>
+
+```toml
+pinning-strategy = "semver"
+```
+
+### detached-environments
+
+Directory where pixi stores workspace environments (normally in `.pixi/envs`).
+
+<ParamField path="detached-environments" type="boolean | string">
+  - `true`: Store in cache directory
+  - `false`: Store in `.pixi/envs` (default)
+  - `"/path/to/dir"`: Store in custom path
+</ParamField>
+
+<Warning>
+  Using detached environments creates a disconnect between the workspace and its environments, requiring manual cleanup when deleting workspaces.
+</Warning>
+
+```toml
+# Store in cache directory
+detached-environments = true
+
+# Or use custom path
+detached-environments = "/opt/pixi/envs"
+```
+
+The resulting structure:
+
+```
+/opt/pixi/envs
+├── pixi-6837172896226367631
+│   └── envs
+└── PROJECT_NAME-HASH
+    ├── envs
+    └── solve-group-envs
+```
+
+### concurrency
+
+Configure concurrency limits for pixi operations.
+
+<ParamField path="concurrency.solves" type="integer">
+  Maximum concurrent solves
+</ParamField>
+
+<ParamField path="concurrency.downloads" type="integer" default="50">
+  Maximum concurrent downloads
+</ParamField>
+
+```toml
+[concurrency]
+solves = 1
+downloads = 12
+```
+
+Or via CLI:
+
+```bash
+pixi config set concurrency.solves 1
+pixi config set concurrency.downloads 12
+```
+
+### proxy-config
+
+Configure HTTP/HTTPS proxies for network operations.
+
+<ParamField path="proxy-config.https" type="string">
+  HTTPS proxy URL (like `https_proxy` environment variable)
+</ParamField>
+
+<ParamField path="proxy-config.http" type="string">
+  HTTP proxy URL (like `http_proxy` environment variable)
+</ParamField>
+
+<ParamField path="proxy-config.non-proxy-hosts" type="array">
+  Domains that should bypass proxies
+</ParamField>
+
+```toml
+[proxy-config]
+https = "https://proxy.company.com:8080"
+http = "http://proxy.company.com:8080"
+non-proxy-hosts = ["localhost", "internal.company.com"]
+```
+
+<Note>
+  Environment variables like `https_proxy` have the highest priority and will override these settings.
+</Note>
+
+### tool-platform
+
+Defines the platform used when installing build backends and tools.
+
+<ParamField path="tool-platform" type="string">
+  Platform identifier (e.g., `linux-64`, `osx-arm64`)
+</ParamField>
+
+```toml
+tool-platform = "linux-64"
+```
+
+<Note>
+  By default, pixi uses the current system platform. Override this for architectures with limited build backend support.
+</Note>
+
+## Experimental Features
+
+### use-environment-activation-cache
+
+Cache environment activation to speed up `pixi run` and `pixi shell`.
+
+```bash
+# Enable globally
+pixi config set experimental.use-environment-activation-cache true --global
+
+# Enable for workspace
+pixi config set experimental.use-environment-activation-cache true --local
+```
+
+Cache structure in `.pixi/activation-env-v0/`:
+
+```json
+{
+  "hash": "8d8344e0751d377a",
+  "environment_variables": {
+    "PATH": "/path/to/env/bin:...",
+    "CONDA_PREFIX": "/path/to/env"
+  }
+}
+```
+
+Ignore cache with:
+
+```bash
+pixi run --force-activate
+pixi shell --force-activate
+```
+
+<Warning>
+  This is experimental because cache invalidation is complex. Use with caution in production environments.
+</Warning>
+
+## Naming Convention
+
+<Note>
+  In pixi 0.20.1 and older, configuration options used `snake_case`. Since 0.20.2, `kebab-case` is used for consistency. Both formats are supported for backward compatibility.
+</Note>
+
+Compatible options:
+- `default_channels` / `default-channels`
+- `change_ps1` / `change-ps1`
+- `tls_no_verify` / `tls-no-verify`
+- `authentication_override_file` / `authentication-override-file`

@@ -1,0 +1,470 @@
+---
+title: pixi install
+description: Install workspace environments
+---
+
+The `pixi install` command installs environments, updating the lock file if necessary.
+
+## Usage
+
+```bash
+pixi install [OPTIONS]
+```
+
+## Overview
+
+The `pixi install` command:
+
+1. Updates the lock file if the manifest changed
+2. Installs packages into the environment
+3. Runs post-install scripts
+
+<Note>
+  You don't need to run `pixi install` before `pixi run` or `pixi shell`. These commands automatically install if needed.
+</Note>
+
+## Options
+
+### Environment Selection
+
+<ParamField path="--environment" type="string">
+  Install specific environment(s). Can be specified multiple times.
+  
+  Short flag: `-e`
+</ParamField>
+
+```bash
+pixi install --environment prod
+pixi install -e test -e lint
+```
+
+Default: Installs the `default` environment.
+
+<ParamField path="--all" type="boolean" default="false">
+  Install all environments defined in the manifest.
+  
+  Short flag: `-a`
+</ParamField>
+
+```bash
+pixi install --all
+```
+
+Conflicts with `--environment`.
+
+### Selective Package Installation
+
+<ParamField path="--skip" type="string">
+  Skip specific package(s). Soft exclusion: package is skipped but dependencies are installed. Can be specified multiple times.
+</ParamField>
+
+```bash
+pixi install --skip cuda --skip cudatoolkit
+```
+
+<ParamField path="--skip-with-deps" type="string">
+  Skip package and its entire dependency tree. Hard exclusion: package and dependencies are excluded unless reachable from other packages. Can be specified multiple times.
+</ParamField>
+
+```bash
+pixi install --skip-with-deps pytorch
+```
+
+<ParamField path="--only" type="string">
+  Install only these package(s) and their dependencies. Can be specified multiple times.
+</ParamField>
+
+```bash
+pixi install --only python --only numpy
+```
+
+## Lock File Options
+
+<ParamField path="--frozen" type="boolean" default="false">
+  Install from lock file without updating it. Fails if lock file is out of sync.
+  
+  Env: `PIXI_FROZEN`
+</ParamField>
+
+```bash
+pixi install --frozen
+export PIXI_FROZEN=true && pixi install
+```
+
+<ParamField path="--locked" type="boolean" default="false">
+  Check if lock file is up-to-date before installing. Aborts if out of sync.
+  
+  Env: `PIXI_LOCKED`
+</ParamField>
+
+```bash
+pixi install --locked
+export PIXI_LOCKED=true && pixi install
+```
+
+## Examples
+
+### Install Default Environment
+
+```bash
+pixi install
+```
+
+Output:
+```
+✓ The default environment has been installed.
+```
+
+### Install Specific Environment
+
+```bash
+pixi install --environment prod
+```
+
+Output:
+```
+✓ The prod environment has been installed.
+```
+
+### Install Multiple Environments
+
+```bash
+pixi install -e dev -e test
+```
+
+Output:
+```
+✓ The following environments have been installed: dev, test.
+```
+
+### Install All Environments
+
+```bash
+pixi install --all
+```
+
+Output:
+```
+✓ The following environments have been installed: default, dev, test, prod.
+```
+
+### Skip Large Packages
+
+Skip CUDA but keep its dependencies:
+
+```bash
+pixi install --skip cuda
+```
+
+Output:
+```
+✓ The default environment has been installed excluding 'cuda'.
+```
+
+### Skip with Dependencies
+
+Skip PyTorch and all its dependencies:
+
+```bash
+pixi install --skip-with-deps pytorch
+```
+
+Output:
+```
+✓ The default environment has been installed excluding 'pytorch' and 15 other packages.
+```
+
+### Install Only Python and NumPy
+
+```bash
+pixi install --only python --only numpy
+```
+
+Output:
+```
+✓ The default environment has been installed, including 8 packages.
+```
+
+### Frozen Install (CI/CD)
+
+```bash
+pixi install --frozen
+```
+
+Fails if lock file doesn't match manifest:
+```
+Error: lock file is out of sync with manifest
+```
+
+### Locked Install (Safety Check)
+
+```bash
+pixi install --locked
+```
+
+Aborts if lock file needs updating:
+```
+Error: lock file is not up-to-date
+```
+
+## Use Cases
+
+### Development Workflow
+
+```bash
+# Make changes to pixi.toml
+pixi add numpy pandas
+
+# Install automatically updates lock file
+pixi install
+
+# Or just run commands (auto-installs)
+pixi run python script.py
+```
+
+### CI/CD Pipeline
+
+```bash
+# Use frozen to ensure reproducibility
+pixi install --frozen
+
+# Run tests
+pixi run pytest
+```
+
+Or with environment variable:
+
+```bash
+export PIXI_FROZEN=true
+pixi install
+pixi run pytest
+```
+
+### Multi-Environment Project
+
+```toml title="pixi.toml"
+[workspace]
+name = "myapp"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = "3.11.*"
+
+[feature.test.dependencies]
+pytest = "*"
+
+[feature.lint.dependencies]
+ruff = "*"
+
+[environments]
+default = []
+test = ["test"]
+lint = ["lint"]
+```
+
+```bash
+# Install all environments
+pixi install --all
+
+# Or install specific ones
+pixi install -e test -e lint
+```
+
+### Skip Heavy Dependencies
+
+For development without GPU:
+
+```bash
+pixi install --skip cuda --skip cudatoolkit
+```
+
+For lightweight testing:
+
+```bash
+pixi install --only python --only pytest
+```
+
+## Detached Environments
+
+When using detached environments:
+
+```toml title="~/.pixi/config.toml"
+detached-environments = "/opt/pixi/envs"
+```
+
+```bash
+pixi install
+```
+
+Output:
+```
+✓ The default environment has been installed in '/opt/pixi/envs/myproject-abc123'.
+```
+
+## Package Filtering Details
+
+### Skip vs Skip-with-deps
+
+**Soft exclusion** (`--skip`):
+```bash
+pixi install --skip pytorch
+```
+
+Result:
+- `pytorch` is skipped
+- Dependencies of `pytorch` are installed if needed by other packages
+
+**Hard exclusion** (`--skip-with-deps`):
+```bash
+pixi install --skip-with-deps pytorch
+```
+
+Result:
+- `pytorch` is skipped
+- All dependencies of `pytorch` are skipped
+- Unless dependencies are needed by other non-skipped packages
+
+### Only Filter
+
+```bash
+pixi install --only numpy
+```
+
+Result:
+- Installs `numpy`
+- Installs all dependencies of `numpy`
+- Skips everything else
+
+### Multiple Filters
+
+Combining filters:
+
+```bash
+pixi install --only python --only pytest --skip-with-deps pytorch
+```
+
+Result:
+- Install `python` and `pytest` with dependencies
+- Skip `pytorch` and its dependencies
+
+## Output Messages
+
+Success with filters:
+
+```bash
+pixi install --skip cuda --skip cudatoolkit
+```
+
+```
+✓ The default environment has been installed excluding 'cuda', 'cudatoolkit'.
+```
+
+With many skipped packages:
+
+```bash
+pixi install --skip-with-deps pytorch
+```
+
+```
+✓ The default environment has been installed excluding 'pytorch' and 12 other packages.
+```
+
+Unmatched skip arguments:
+
+```bash
+pixi install --skip nonexistent
+```
+
+```
+WARNING: The skipped arg(s) 'nonexistent' did not match any packages in the lock file
+✓ The default environment has been installed no packages were skipped (check if cli args were correct).
+```
+
+## Global Options
+
+<ParamField path="--manifest-path" type="string">
+  Path to `pixi.toml`, `pyproject.toml`, or workspace directory.
+  
+  Short flag: `-m`
+</ParamField>
+
+```bash
+pixi install --manifest-path /path/to/project
+```
+
+## Config Options
+
+- `--auth-file <FILE>`: Authentication credentials file
+- `--tls-no-verify`: Disable TLS verification
+- `--concurrent-downloads <N>`: Max concurrent downloads (default: 50)
+- `--concurrent-solves <N>`: Max concurrent solves
+
+## Troubleshooting
+
+### Lock File Out of Sync
+
+Error: `lock file is out of sync`
+
+Solution: Run without `--frozen`:
+
+```bash
+pixi install
+```
+
+### Package Not Found
+
+Error: `package 'xyz' not found`
+
+Solution: Check package name and channel:
+
+```bash
+pixi search xyz
+pixi add xyz
+```
+
+### Solver Conflict
+
+Error: `cannot solve dependencies`
+
+Solution: Check version constraints:
+
+```bash
+# Relax constraints in pixi.toml
+[dependencies]
+python = ">=3.10"  # instead of "3.11.*"
+```
+
+### Disk Space Issues
+
+Error: `no space left on device`
+
+Solution: Clean cache:
+
+```bash
+pixi clean cache
+```
+
+### Network Issues
+
+Error: `failed to download`
+
+Solution: Check connectivity and proxies:
+
+```bash
+pixi install -vvv  # Verbose output
+```
+
+## Performance Tips
+
+1. **Use `--frozen` in CI** to skip lock file updates
+2. **Skip heavy packages** during development
+3. **Install only what you need** with `--only`
+4. **Use detached environments** for faster workspace deletion
+
+## See Also
+
+- [pixi add](/commands/add) - Add dependencies
+- [pixi remove](/commands/remove) - Remove dependencies
+- [pixi update](/commands/update) - Update lock file
+- [pixi reinstall](/commands/install) - Reinstall environments

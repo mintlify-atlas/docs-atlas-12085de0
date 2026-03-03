@@ -1,0 +1,420 @@
+---
+title: 'S3 Deployment'
+description: 'Use S3 and S3-compatible storage as conda package channels'
+---
+
+Pixi can use S3 object storage as a conda channel, enabling private package hosting and distribution.
+
+## Basic Configuration
+
+Add an S3 bucket as a channel in your `pixi.toml`:
+
+```toml pixi.toml
+[workspace]
+channels = ["s3://my-bucket/custom-channel"]
+```
+
+### Repository Structure
+
+Your S3 bucket must follow the standard conda repository structure:
+
+```
+my-bucket/
+└── custom-channel/
+    ├── noarch/
+    │   ├── repodata.json
+    │   └── package-1.0.0-py_0.conda
+    └── linux-64/
+        ├── repodata.json
+        └── package-1.0.0-h123456_0.conda
+```
+
+## Authentication Methods
+
+Pixi supports two mutually exclusive authentication methods:
+
+1. **AWS Credentials** - Standard AWS configuration files and environment variables
+2. **Pixi Configuration** - Custom S3-compatible storage with Pixi's auth system
+
+<Warning>
+These methods are mutually exclusive. Specifying `s3-options` deactivates AWS credential fetching.
+</Warning>
+
+## Using AWS Configuration
+
+Use standard AWS credentials without any special Pixi configuration.
+
+### Environment Variables
+
+Set AWS credentials in your environment:
+
+```bash
+export AWS_ACCESS_KEY_ID=your-access-key-id
+export AWS_SECRET_ACCESS_KEY=your-secret-access-key
+export AWS_DEFAULT_REGION=us-east-1
+
+pixi install
+```
+
+### AWS Configuration File
+
+Use AWS profiles for more complex setups:
+
+```ini aws.config
+[profile conda]
+sso_account_id = 123456789012
+sso_role_name = PowerUserAccess
+sso_start_url = https://my-company.awsapps.com/start
+sso_region = eu-central-1
+region = eu-central-1
+output = json
+```
+
+<Steps>
+  <Step title="Configure AWS">
+    ```bash
+    export AWS_CONFIG_FILE=/path/to/aws.config
+    export AWS_PROFILE=conda
+    ```
+  </Step>
+  
+  <Step title="Login via SSO">
+    ```bash
+    aws sso login
+    ```
+    
+    Follow the browser prompts to authenticate.
+  </Step>
+  
+  <Step title="Use Pixi">
+    ```bash
+    pixi search -c s3://my-s3-bucket/channel my-private-package
+    ```
+  </Step>
+</Steps>
+
+### GitHub Actions with OIDC
+
+Use temporary credentials via OpenID Connect:
+
+```yaml ci.yml
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      
+      - name: Log in to AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/github-poweruser
+          aws-region: eu-central-1
+      
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@v0.8.3
+        # AWS credentials are automatically available
+      
+      - name: Install dependencies
+        run: pixi install
+```
+
+## Using Pixi's Configuration
+
+For S3-compatible storage providers or custom setups.
+
+### Workspace Configuration
+
+Configure S3 options per bucket in `pixi.toml`:
+
+```toml pixi.toml
+[workspace]
+channels = ["s3://my-bucket/channel"]
+
+[workspace.s3-options.my-bucket]
+endpoint-url = "https://my-s3-host"
+region = "us-east-1"
+force-path-style = false
+```
+
+<Note>
+You must configure `s3-options` for each bucket you use: `[workspace.s3-options.<bucket-name>]`
+</Note>
+
+### Authentication
+
+Store credentials using Pixi's auth system:
+
+```bash
+pixi auth login s3://my-s3-bucket \
+  --s3-access-key-id=<access-key-id> \
+  --s3-secret-access-key=<secret-access-key>
+
+pixi search my-private-package
+```
+
+### Global Configuration
+
+Alternatively, configure S3 options globally:
+
+```toml config.toml
+[s3-options.my-bucket]
+endpoint-url = "https://my-s3-host"
+region = "us-east-1"
+force-path-style = false
+```
+
+See [Pixi configuration documentation](/reference/configuration) for the config file location.
+
+### GitHub Actions with Pixi Auth
+
+```yaml ci.yml
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      
+      - name: Log in to AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        id: aws
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/github-poweruser
+          aws-region: eu-central-1
+      
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@v0.8.3
+        with:
+          auth-host: s3://my-s3-bucket
+          auth-s3-access-key-id: ${{ steps.aws.outputs.aws-access-key-id }}
+          auth-s3-secret-access-key: ${{ steps.aws.outputs.aws-secret-access-key }}
+          auth-s3-session-token: ${{ steps.aws.outputs.aws-session-token }}
+```
+
+## Public S3 Buckets
+
+Public buckets can be accessed via standard HTTPS URLs without authentication:
+
+```toml pixi.toml
+[workspace]
+channels = ["https://my-public-bucket.s3.eu-central-1.amazonaws.com/channel"]
+```
+
+### AWS Bucket Policy
+
+Configure your bucket for public access:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadGetObject",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::my-public-bucket/*"
+    },
+    {
+      "Sid": "PublicReadListBucket",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::my-public-bucket"
+    }
+  ]
+}
+```
+
+## S3-Compatible Storage Providers
+
+Pixi works with various S3-compatible storage services.
+
+### MinIO
+
+```toml pixi.toml
+[workspace.s3-options.my-minio-bucket]
+endpoint-url = "https://minio.example.com"
+region = "us-east-1"
+force-path-style = true
+```
+
+### Cloudflare R2
+
+```toml pixi.toml
+[workspace.s3-options.my-r2-bucket]
+endpoint-url = "https://<account-id>.eu.r2.cloudflarestorage.com"
+region = "WEUR"
+force-path-style = false
+```
+
+<Note>
+Cloudflare R2 supports public buckets via `r2.dev` subdomains or custom domains. See [Cloudflare R2 docs](https://developers.cloudflare.com/r2/buckets/public-buckets/).
+</Note>
+
+### Wasabi
+
+```toml pixi.toml
+[workspace.s3-options.my-wasabi-bucket]
+endpoint-url = "https://s3.de-1.wasabisys.com"
+region = "de-1"
+force-path-style = false
+```
+
+### Backblaze B2
+
+```toml pixi.toml
+[workspace.s3-options.my-b2-bucket]
+endpoint-url = "https://s3.us-west-004.backblazeb2.com"
+region = "us-west-004"
+force-path-style = true
+```
+
+### Google Cloud Storage
+
+```toml pixi.toml
+[workspace.s3-options.my-gcs-bucket]
+endpoint-url = "https://storage.googleapis.com"
+region = "us-east-1"
+force-path-style = false
+```
+
+<Note>
+Pixi also supports `gcs://` URLs for Google Cloud Storage.
+</Note>
+
+### Hetzner Object Storage
+
+```toml pixi.toml
+[workspace.s3-options.my-hetzner-bucket]
+endpoint-url = "https://fsn1.your-objectstorage.com"
+region = "US"
+force-path-style = false
+```
+
+## Uploading Packages to S3
+
+### Using Pixi
+
+Upload packages directly with Pixi:
+
+```bash
+pixi upload s3 \
+  --bucket my-s3-bucket \
+  --channel my-channel \
+  --region us-east-1 \
+  --endpoint-url https://my-s3-host \
+  my_package.conda
+```
+
+Use `pixi upload s3 --help` for all available options.
+
+### Using rattler-build
+
+If you're building packages with rattler-build:
+
+```bash
+rattler-build upload s3 \
+  --bucket my-s3-bucket \
+  --channel my-channel \
+  my_package.conda
+```
+
+See [rattler-build's documentation](https://rattler-build.prefix.dev/latest/authentication_and_upload/#s3) for details.
+
+## Re-indexing After Upload
+
+S3 buckets require manual reindexing after uploading new packages, unlike managed package servers.
+
+<Steps>
+  <Step title="Install rattler-index">
+    ```bash
+    pixi global install rattler-index
+    ```
+    
+    Or use via `pixi exec`:
+    ```bash
+    pixi exec rattler-index --help
+    ```
+  </Step>
+  
+  <Step title="Re-index the channel">
+    ```bash
+    pixi exec rattler-index s3 s3://my-s3-bucket/my-channel \
+      --endpoint-url https://my-s3-host \
+      --region us-east-1 \
+      --force-path-style \
+      --access-key-id <access-key-id> \
+      --secret-access-key <secret-access-key>
+    ```
+  </Step>
+</Steps>
+
+This updates the `repodata.json` files to include newly uploaded packages.
+
+## Configuration Options
+
+### S3 Options Reference
+
+| Option | Description | Required |
+|--------|-------------|----------|
+| `endpoint-url` | S3 endpoint URL | Yes |
+| `region` | AWS region | Yes |
+| `force-path-style` | Use path-style URLs | Yes |
+
+### Path Style URLs
+
+- **Path-style**: `https://s3.amazonaws.com/bucket/key`
+- **Virtual-hosted-style**: `https://bucket.s3.amazonaws.com/key`
+
+Set `force-path-style = true` for providers that require path-style URLs (MinIO, Backblaze B2).
+
+## Best Practices
+
+<Card title="Use IAM Roles" icon="user-shield">
+In AWS environments, use IAM roles instead of long-lived access keys for better security.
+</Card>
+
+<Card title="Separate Channels" icon="folder-tree">
+Organize packages into separate channels (e.g., dev, staging, prod) within the same bucket.
+</Card>
+
+<Card title="Automate Indexing" icon="robot">
+Integrate reindexing into your CI/CD pipeline after package uploads.
+</Card>
+
+<Card title="Enable Versioning" icon="clock-rotate-left">
+Enable S3 bucket versioning to protect against accidental deletions.
+</Card>
+
+<Card title="Monitor Costs" icon="chart-line">
+Monitor S3 costs, especially for public buckets with high traffic.
+</Card>
+
+## Troubleshooting
+
+### Access Denied Errors
+
+Ensure your credentials have the required permissions:
+- `s3:GetObject` - Download packages
+- `s3:ListBucket` - List package contents
+- `s3:PutObject` - Upload packages (if needed)
+
+### Invalid Endpoint
+
+Verify the endpoint URL matches your provider's documentation and includes the protocol (`https://`).
+
+### Repository Structure Issues
+
+Confirm your bucket follows the conda channel structure with `repodata.json` in each platform subdirectory.

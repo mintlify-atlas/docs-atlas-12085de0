@@ -1,0 +1,513 @@
+---
+title: 'GitHub Actions'
+description: 'Integrate Pixi with GitHub Actions for CI/CD workflows'
+---
+
+The [prefix-dev/setup-pixi](https://github.com/prefix-dev/setup-pixi) action makes it easy to use Pixi in GitHub Actions workflows.
+
+## Quick Start
+
+```yaml .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.65.0
+          cache: true
+      
+      - run: pixi run test
+```
+
+<Warning>
+Pin the action version (e.g., `prefix-dev/setup-pixi@v0.9.4`) to avoid breaking changes. Use Dependabot to keep it updated.
+</Warning>
+
+## Version Pinning with Dependabot
+
+Automatically update the action version:
+
+```yaml .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 7
+```
+
+## Key Features
+
+### Caching
+
+Automatic caching speeds up workflows by reusing installed environments.
+
+#### Project Environment Caching
+
+Enabled by default when `pixi.lock` exists:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    cache: true  # Default when pixi.lock exists
+```
+
+#### Global Environment Caching
+
+Disabled by default, expires monthly:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    cache: true
+    global-cache: true
+```
+
+#### Custom Cache Keys
+
+Customize cache key prefixes:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    cache: true
+    cache-key: my-custom-key-
+    global-cache-key: my-global-key-
+```
+
+#### Save Caches Only on Main
+
+Prevent hitting the 10GB cache limit:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    cache: true
+    cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+```
+
+### Multiple Environments
+
+Test across different Python versions or configurations.
+
+#### Environment Configuration
+
+```toml pixi.toml
+[workspace]
+name = "my-package"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = ">=3.11"
+polars = ">=0.14.24,<0.21"
+
+[feature.py311.dependencies]
+python = "3.11.*"
+
+[feature.py312.dependencies]
+python = "3.12.*"
+
+[environments]
+py311 = ["py311"]
+py312 = ["py312"]
+```
+
+#### Matrix Strategy
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [py311, py312]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          environments: ${{ matrix.environment }}
+      
+      - run: pixi run test
+```
+
+#### Multiple Environments in One Job
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    environments: >-
+      py311
+      py312
+
+- run: |
+    pixi run -e py311 test
+    pixi run -e py312 test
+```
+
+<Warning>
+If you don't specify environments, only the `default` environment is cached, even if you use others.
+</Warning>
+
+### Global Environments
+
+Install tools needed before `pixi install` runs:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    global-cache: true
+    global-environments: |
+      google-cloud-sdk
+      keyring --with keyrings.google-artifactregistry-auth
+
+- run: |
+    gcloud --version
+    keyring --list-backends
+```
+
+## Authentication
+
+### Token Authentication
+
+For prefix.dev and similar services:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    auth-host: prefix.dev
+    auth-token: ${{ secrets.PREFIX_DEV_TOKEN }}
+```
+
+<Warning>
+Always use GitHub secrets for sensitive information. Never commit credentials to your repository.
+</Warning>
+
+### Username and Password
+
+For Artifactory and enterprise environments:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    auth-host: custom-artifactory.com
+    auth-username: ${{ secrets.PIXI_USERNAME }}
+    auth-password: ${{ secrets.PIXI_PASSWORD }}
+```
+
+### Conda Token
+
+For anaconda.org and Quetz:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    auth-host: anaconda.org
+    auth-conda-token: ${{ secrets.CONDA_TOKEN }}
+```
+
+### S3 Authentication
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    auth-host: s3://my-s3-bucket
+    auth-s3-access-key-id: ${{ secrets.ACCESS_KEY_ID }}
+    auth-s3-secret-access-key: ${{ secrets.SECRET_ACCESS_KEY }}
+    auth-s3-session-token: ${{ secrets.SESSION_TOKEN }}  # Optional
+```
+
+See the [S3 documentation](/deployment/s3) and [authentication guide](/deployment/authentication) for details.
+
+### PyPI Keyring Provider
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    pypi-keyring-provider: subprocess
+```
+
+## Custom Shell Wrapper
+
+Run commands inside the Pixi environment without `pixi run`:
+
+<CodeGroup>
+```yaml Bash
+- run: |
+    python --version
+    pip install --no-deps -e .
+  shell: pixi run bash -e {0}
+```
+
+```yaml Python
+- run: |
+    import my_package
+    print("Hello world!")
+  shell: pixi run python {0}
+```
+
+```yaml PowerShell
+- run: |
+    python --version | Select-String "3.11"
+  shell: pixi run pwsh -Command {0}
+```
+</CodeGroup>
+
+<Note>
+The `{0}` placeholder is replaced with a temporary script file created by GitHub Actions.
+</Note>
+
+### One-off Commands with pixi exec
+
+Run commands in a temporary environment:
+
+<CodeGroup>
+```yaml Bash
+- run: |
+    zstd --version
+  shell: pixi exec --spec zstd -- bash -e {0}
+```
+
+```yaml Python
+- run: |
+    import ruamel.yaml
+    # ...
+  shell: pixi exec --spec python=3.11.* --spec ruamel.yaml -- python {0}
+```
+</CodeGroup>
+
+## Environment Activation
+
+Activate the environment for all subsequent steps:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    activate-environment: true
+
+- run: python --version  # No 'pixi run' needed
+
+- run: pytest tests/     # Directly use installed tools
+```
+
+### With Multiple Environments
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    environments: >-
+      py311
+      py312
+    activate-environment: py311
+
+- run: python --version  # Uses py311 environment
+```
+
+This is useful for non-shell steps that need binaries on the PATH.
+
+## Lock File Management
+
+### --frozen Flag
+
+Reject any changes to the lockfile:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    frozen: true
+```
+
+### --locked Flag
+
+Only install if lockfile is up-to-date:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    locked: true
+```
+
+<Note>
+By default, the action runs:
+- `pixi install --locked` if `pixi.lock` exists
+- `pixi install` otherwise
+</Note>
+
+See the [official documentation](/commands/install) for more details.
+
+## Debugging
+
+### Action Debug Logging
+
+Enable by re-running the workflow in debug mode via the GitHub UI.
+
+### Pixi Debug Logging
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    log-level: vvv  # Options: q, default, v, vv, vvv
+```
+
+The log level defaults to `vv` when action debug logging is enabled.
+
+## Self-Hosted Runners
+
+Configure cleanup and custom paths for self-hosted runners:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    post-cleanup: true  # Default: true
+    pixi-bin-path: ${{ runner.temp }}/bin/pixi
+```
+
+Post-cleanup removes:
+- `.pixi` environment
+- Pixi binary
+- Rattler cache
+- Other rattler files in `~/.rattler`
+
+### Use Pre-installed Pixi
+
+If Pixi is already installed on the runner, omit version configuration:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  # No pixi-version, pixi-url, or pixi-bin-path
+```
+
+The action will use the Pixi found in PATH.
+
+## Advanced Configuration
+
+### pyproject.toml as Manifest
+
+Use `pyproject.toml` instead of `pixi.toml`:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    manifest-path: pyproject.toml
+```
+
+<Note>
+The action auto-detects `pyproject.toml` if it contains `[tool.pixi.workspace]` and no `pixi.toml` exists.
+</Note>
+
+### Working Directory for Monorepos
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    working-directory: ./packages/my-project
+
+- run: pixi run test
+  working-directory: ./packages/my-project
+```
+
+### Custom Download URL
+
+Download Pixi from a custom mirror:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    pixi-url: https://pixi-mirror.example.com/releases/download/v0.48.0/pixi-x86_64-unknown-linux-musl
+    pixi-url-headers: '{"Authorization": "Bearer ${{ secrets.PIXI_MIRROR_TOKEN }}"}'
+```
+
+### Install-Only Mode
+
+Only install Pixi without running `pixi install`:
+
+```yaml
+- uses: prefix-dev/setup-pixi@v0.9.4
+  with:
+    run-install: false
+
+- run: pixi info
+```
+
+## Complete Example
+
+```yaml .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: [py311, py312]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.65.0
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+          environments: ${{ matrix.python-version }}
+          locked: true
+      
+      - name: Run tests
+        run: pixi run -e ${{ matrix.python-version }} test
+      
+      - name: Run linting
+        run: pixi run -e ${{ matrix.python-version }} lint
+      
+      - name: Build package
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == 'py312'
+        run: pixi run build
+```
+
+## Best Practices
+
+<Card title="Pin Versions" icon="thumbtack">
+Always pin the action version and use Dependabot for updates.
+</Card>
+
+<Card title="Cache Wisely" icon="database">
+Only save caches on main branch to avoid hitting the 10GB limit.
+</Card>
+
+<Card title="Use Secrets" icon="key">
+Store all sensitive data in GitHub Secrets, never in code.
+</Card>
+
+<Card title="Matrix Testing" icon="table-cells">
+Test across multiple OS and Python versions for better coverage.
+</Card>
+
+<Card title="Locked Installs" icon="lock">
+Use `locked: true` in CI to ensure reproducible builds.
+</Card>
+
+## More Examples
+
+For additional examples, see the [setup-pixi test workflows](https://github.com/prefix-dev/setup-pixi/blob/main/.github/workflows/test.yml).

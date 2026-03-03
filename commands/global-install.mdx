@@ -1,0 +1,280 @@
+---
+title: pixi global install
+description: Install packages globally
+---
+
+Installs packages in globally accessible environments and exposes their command-line applications. This is similar to `pipx` or `condax` for conda packages.
+
+## Usage
+
+```bash
+pixi global install [OPTIONS] <PACKAGE>...
+```
+
+**Alias:** `pixi g install`, `pixi g i`
+
+## Arguments
+
+<ParamField path="PACKAGE" type="string" required>
+  Package(s) to install. Can be:
+  - Package name: `python`
+  - Package with version: `python==3.12`
+  - Package with version constraint: `python>=3.11,<3.13`
+  - Local path: `/path/to/package` or `./relative/path`
+  - URL: `https://example.com/package.tar.bz2`
+</ParamField>
+
+## Options
+
+<ParamField path="--channel" type="string" shorthand="c">
+  The channels to consider as a name or URL.
+  
+  Multiple channels can be specified by using this field multiple times.
+  
+  By default, if no channel is provided, `conda-forge` is used.
+</ParamField>
+
+<ParamField path="--platform" type="string" shorthand="p">
+  The platform to install the packages for.
+  
+  This is useful when you want to install packages for a different platform than the one you are currently on. Often used to install `osx-64` packages on `osx-arm64`.
+</ParamField>
+
+<ParamField path="--environment" type="string" shorthand="e">
+  Install all packages in the same environment.
+  
+  By default, each package gets its own environment named after the package.
+</ParamField>
+
+<ParamField path="--expose" type="mapping">
+  Add one or more mappings describing which executables are exposed.
+  
+  Syntax: `exposed_name=executable_name` or just `executable_name`
+  
+  Example: `--expose python3.10=python`
+</ParamField>
+
+<ParamField path="--with" type="string">
+  Add additional dependencies to the environment.
+  
+  Their executables will not be exposed.
+</ParamField>
+
+<ParamField path="--force-reinstall" type="boolean">
+  Force reinstall the environment even if it already exists.
+</ParamField>
+
+<ParamField path="--no-shortcuts" type="boolean">
+  Do not create shortcuts (desktop/start menu entries) for the installed packages.
+  
+  Alias: `--no-shortcut`
+</ParamField>
+
+## Examples
+
+### Install a single package
+
+```bash
+pixi global install cowpy
+```
+
+This installs `cowpy` in its own environment and exposes its executables.
+
+### Install multiple packages
+
+```bash
+pixi global install starship nushell ripgrep bat
+```
+
+Each package is installed in a separate environment.
+
+### Install with additional dependencies
+
+```bash
+pixi global install jupyter --with polars
+```
+
+Installs `jupyter` with `polars` as an additional dependency, but only exposes `jupyter` executables.
+
+### Install with custom exposed names
+
+```bash
+pixi global install --expose python3.8=python python=3.8
+```
+
+Installs Python 3.8 and exposes it as `python3.8`.
+
+### Install multiple packages in one environment
+
+```bash
+pixi global install --environment science --expose jupyter --expose ipython jupyter ipython polars
+```
+
+Installs all packages in an environment named "science" and only exposes `jupyter` and `ipython`.
+
+### Install from a specific channel
+
+```bash
+pixi global install --channel conda-forge --channel bioconda samtools
+```
+
+### Install a specific version
+
+```bash
+pixi global install "python==3.12"
+```
+
+### Cross-platform installation
+
+```bash
+pixi global install --platform osx-64 some-package
+```
+
+Useful on Apple Silicon Macs to install x86_64 packages.
+
+### Force reinstall
+
+```bash
+pixi global install --force-reinstall python
+```
+
+### Install without shortcuts
+
+```bash
+pixi global install --no-shortcuts jupyter
+```
+
+## How It Works
+
+1. **Environment Creation**: Each package gets its own isolated environment (unless `--environment` is used)
+2. **Package Installation**: The package and its dependencies are installed
+3. **Executable Exposure**: Command-line tools are exposed to your PATH
+4. **Shortcut Creation**: Desktop/start menu shortcuts are created if applicable
+
+## Environment Naming
+
+By default, environments are named after the package:
+- `pixi global install python` creates an environment named `python`
+- `pixi global install jupyter` creates an environment named `jupyter`
+
+Use `--environment` to specify a custom name:
+```bash
+pixi global install --environment myenv python numpy
+```
+
+## Exposed Executables
+
+By default, all executables from the main package are exposed. Use `--expose` to control this:
+
+```bash
+# Expose only specific executables
+pixi global install --expose jupyter jupyter
+
+# Expose with a different name
+pixi global install --expose py=python python
+```
+
+## Additional Dependencies
+
+Use `--with` to include dependencies without exposing their executables:
+
+```bash
+pixi global install jupyter --with matplotlib --with pandas
+```
+
+This installs `jupyter`, `matplotlib`, and `pandas`, but only exposes `jupyter` commands.
+
+## Channels
+
+Specify channels to search for packages:
+
+```bash
+pixi global install --channel conda-forge --channel bioconda package-name
+```
+
+<Note>
+  When specifying a channel, it's common that the selected channel also depends on `conda-forge`. Pixi handles this automatically.
+</Note>
+
+## Use Cases
+
+### Development Tools
+
+```bash
+pixi global install black ruff mypy pytest
+```
+
+### CLI Utilities
+
+```bash
+pixi global install ripgrep fd-find bat exa
+```
+
+### Python Environments
+
+```bash
+pixi global install python=3.11
+pixi global install python=3.12
+```
+
+### Data Science Tools
+
+```bash
+pixi global install --environment ds --with numpy --with pandas jupyter
+```
+
+## Shortcuts
+
+On Windows and macOS, pixi can create shortcuts for GUI applications:
+- Windows: Start Menu entries
+- macOS: Application bundles
+
+Use `--no-shortcuts` to disable this behavior.
+
+## Listing Installed Packages
+
+After installation, pixi shows what was installed:
+
+```
+✓ Installed package-name 1.0.0
+  Exposed executables:
+  - command1
+  - command2
+```
+
+To see all globally installed packages:
+```bash
+pixi global list
+```
+
+<Tip>
+  Use `pixi g i` as a shorthand for `pixi global install`.
+</Tip>
+
+## Differences from Workspace Installation
+
+| Feature | Global Install | Workspace Install |
+|---------|----------------|------------------|
+| Scope | System-wide | Project-specific |
+| Configuration | Automatic | `pixi.toml` |
+| Isolation | Per-package | Per-project |
+| Use case | CLI tools | Development |
+
+## Updating Packages
+
+To update globally installed packages:
+```bash
+pixi global update package-name
+```
+
+Or update all:
+```bash
+pixi global update --all
+```
+
+## Removing Packages
+
+To remove a globally installed environment:
+```bash
+pixi global remove package-name
+```

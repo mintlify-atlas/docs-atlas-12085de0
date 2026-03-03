@@ -1,0 +1,280 @@
+---
+title: pixi global list
+description: List global environments and packages
+---
+
+Lists global environments with their dependencies and exposed commands. Can also display all packages within a specific global environment.
+
+## Usage
+
+```bash
+pixi global list [OPTIONS] [REGEX]
+```
+
+**Alias:** `pixi g list`, `pixi g ls`
+
+## Arguments
+
+<ParamField path="REGEX" type="string">
+  List only packages matching a regular expression.
+  
+  Without regex syntax, it acts like a `contains` filter.
+</ParamField>
+
+## Options
+
+<ParamField path="--environment" type="string" shorthand="e">
+  List all packages in a specific environment, with output similar to `pixi list`.
+</ParamField>
+
+<ParamField path="--sort-by" type="string" default="name">
+  Sorting strategy for the package table of an environment.
+  
+  Options: `name`, `size`
+  
+  Requires `--environment`.
+</ParamField>
+
+<ParamField path="--json" type="boolean">
+  Output in JSON format.
+</ParamField>
+
+## Examples
+
+### List all global environments
+
+```bash
+pixi global list
+```
+
+Output:
+```
+python (Python 3.12.0)
+  Packages: python, pip
+  Exposed: python, python3, pip
+
+jupyter (Jupyter Lab 4.0.9)
+  Packages: jupyter, ipython, polars
+  Exposed: jupyter, jupyter-lab, ipython
+
+starship (Starship 1.17.0)
+  Packages: starship
+  Exposed: starship
+```
+
+### List environments matching a pattern
+
+```bash
+pixi global list py
+```
+
+Shows only environments containing "py" in their name or packages.
+
+### List packages in a specific environment
+
+```bash
+pixi global list --environment python
+```
+
+Output (similar to `pixi list`):
+```
+Package    Version    Build          Size     Kind   Source
+python     3.12.0     h1234567_0     45.2 MB  conda  conda-forge
+pip        23.3.1     pyhd8ed1ab_0   2.1 MB   conda  conda-forge
+setuptools 69.0.2     pyhd8ed1ab_0   500 KB   conda  conda-forge
+```
+
+### Sort packages by size
+
+```bash
+pixi global list --environment python --sort-by size
+```
+
+### Output as JSON
+
+```bash
+pixi global list --json
+```
+
+## Display Format
+
+### All Environments
+
+When listing all environments:
+- **Yellow**: Exposed binaries (executables available in your PATH)
+- **Green**: Explicit package dependencies
+- **Blue**: Package versions
+- **Cyan**: Environment names
+
+### Per Environment
+
+When using `--environment`:
+- **Green**: Explicitly installed packages (bold)
+- Regular text: Transitive dependencies
+
+## JSON Output Format
+
+### All Environments
+
+```json
+[
+  {
+    "name": "python",
+    "packages": [
+      {
+        "name": "python",
+        "version": "3.12.0",
+        "build": "h1234567_0"
+      }
+    ],
+    "exposed": ["python", "python3", "pip"]
+  }
+]
+```
+
+### Specific Environment
+
+```json
+[
+  {
+    "name": "python",
+    "version": "3.12.0",
+    "build": "h1234567_0",
+    "size_bytes": 47382912,
+    "kind": "Conda",
+    "source": "https://conda.anaconda.org/conda-forge",
+    "is_explicit": true
+  }
+]
+```
+
+## Use Cases
+
+### Check What's Installed
+
+```bash
+pixi global list
+```
+
+### Find Available Commands
+
+```bash
+pixi global list | grep "Exposed:"
+```
+
+### Audit a Specific Environment
+
+```bash
+pixi global list --environment python
+```
+
+### Export Environment Information
+
+```bash
+pixi global list --environment python --json > python-env.json
+```
+
+### Check if Environment is in Sync
+
+Pixi will warn you if environments are out of sync:
+
+```bash
+pixi global list
+# Warning: The environments are not in sync with the manifest
+# Run: pixi global sync
+```
+
+## Filtering
+
+### By Name
+
+```bash
+pixi global list python
+```
+
+Shows environments with "python" in the name or package list.
+
+### By Regex
+
+```bash
+pixi global list "^py.*"
+```
+
+Shows environments starting with "py".
+
+## Environment Status
+
+The list command will warn you if:
+- Environments are out of sync with the manifest
+- An environment needs to be synced
+
+To fix:
+```bash
+pixi global sync
+```
+
+## Sorting Options
+
+### By Name (default)
+
+```bash
+pixi global list --environment myenv --sort-by name
+```
+
+### By Size
+
+```bash
+pixi global list --environment myenv --sort-by size
+```
+
+<Note>
+  Sorting options only work with the `--environment` flag.
+</Note>
+
+## Understanding the Output
+
+### Exposed vs Installed
+
+- **Installed packages**: All packages in the environment
+- **Exposed executables**: Commands available in your PATH
+
+Example:
+```bash
+pixi global install jupyter --with matplotlib
+```
+
+Output:
+```
+jupyter
+  Packages: jupyter, matplotlib, ...
+  Exposed: jupyter, jupyter-lab  # matplotlib commands NOT exposed
+```
+
+### Explicit vs Transitive
+
+When using `--environment`:
+- **Explicit** (bold green): Packages you installed
+- **Transitive**: Dependencies of those packages
+
+<Tip>
+  Use `pixi g ls` as a shorthand for `pixi global list`.
+</Tip>
+
+## Complete Workflow
+
+```bash
+# Install some packages
+pixi global install python jupyter starship
+
+# List everything
+pixi global list
+
+# Check a specific environment
+pixi global list --environment python
+
+# Find large packages
+pixi global list --environment python --sort-by size
+
+# Export to JSON
+pixi global list --json > global-envs.json
+```

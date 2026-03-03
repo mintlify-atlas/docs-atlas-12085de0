@@ -1,0 +1,477 @@
+---
+title: Package Specifications
+description: Understanding package specification syntax for conda and PyPI packages
+---
+
+When adding packages to Pixi, you can use precise specifications to control which package versions and builds you install. This is especially important for packages with multiple builds for different hardware configurations.
+
+## Quick Examples
+
+<Tabs>
+  <Tab title="pixi add">
+    ```bash
+    # Simple package
+    pixi add python
+
+    # Specific version
+    pixi add "python==3.11.0"
+
+    # Version range
+    pixi add "numpy>=1.21,<2.0"
+
+    # Specific build
+    pixi add "pytorch=2.0.*=cuda*"
+
+    # From specific channel
+    pixi add pytorch::pytorch
+    pixi add "pytorch[channel='pytorch']"
+    ```
+  </Tab>
+  <Tab title="pixi global">
+    ```bash
+    # Global tool installation
+    pixi global install ruff
+
+    # Specific version
+    pixi global install "ruff==0.1.0"
+
+    # From channel
+    pixi global install conda-forge::mamba
+    ```
+  </Tab>
+  <Tab title="pixi exec">
+    ```bash
+    # Run with specific package
+    pixi exec python --version
+
+    # Specific version
+    pixi exec "python==3.11" script.py
+
+    # Multiple packages
+    pixi exec "python==3.11" numpy -- python -c "import numpy"
+    ```
+  </Tab>
+</Tabs>
+
+## Conda Package Specifications
+
+Pixi uses the [conda MatchSpec](https://rattler.prefix.dev/py-rattler/match_spec#matchspec) format for specifying conda package requirements.
+
+### Basic Version Specifications
+
+Simple version constraints:
+
+```toml
+[dependencies]
+python = ">=3.8"
+numpy = "1.21.*"
+pandas = ">=1.3,<2.0"
+scipy = "*"  # Any version
+```
+
+### Version Operators
+
+| Operator | Meaning | Example |
+|----------|---------|----------|
+| `==` | Exact match | `==3.11.0` |
+| `!=` | Not equal | `!=3.8` |
+| `<` | Less than | `<3.12` |
+| `<=` | Less than or equal | `<=3.11` |
+| `>` | Greater than | `>3.9` |
+| `>=` | Greater than or equal | `>=3.9` |
+| `~=` | Compatible release | `~=3.11.0` (≥3.11.0, &lt;3.12.0) |
+| `*` | Wildcard | `3.11.*` (any 3.11.x) |
+| `,` | AND | `">=3.9,<3.12"` |
+| `|` | OR | `"3.10|3.11"` |
+
+<Tip>
+Use `~=` for compatible releases: `~=3.11.0` means `>=3.11.0,&lt;3.12.0`.
+</Tip>
+
+## Full MatchSpec Syntax
+
+For precise control over package variants, use the full MatchSpec syntax:
+
+### Command Line Syntax
+
+**Equals syntax (compact):**
+```bash
+# Format: package=version=build
+pixi add "pytorch=2.0.*=cuda*"
+
+# Only build string (any version)
+pixi add "numpy=*=py311*"
+```
+
+**Bracket syntax (explicit):**
+```bash
+# Format: package[key='value', ...]
+pixi add "pytorch[version='2.0.*', build='cuda*']"
+
+# Multiple constraints
+pixi add "numpy[version='>=1.21', build='py311*', channel='conda-forge']"
+
+# Build number constraint
+pixi add "python[version='3.11.0', build_number='>=1']"
+```
+
+<Note>
+Both syntaxes are equivalent - use whichever is clearer for your use case.
+</Note>
+
+### TOML Mapping Syntax
+
+In `pixi.toml`, use the mapping syntax for complete control:
+
+```toml
+[dependencies]
+pytorch = { version = "2.0.*", build = "cuda*", channel = "pytorch" }
+numpy = { version = ">=1.21", build = "py311*" }
+python = { version = "3.11.0", build-number = ">=1" }
+verified-pkg = { version = "1.0.0", sha256 = "abc123..." }
+```
+
+Available fields:
+- **version** - Version constraint with operators
+- **build** - Build string pattern with wildcards
+- **build-number** - Build number constraint
+- **channel** - Channel name or URL
+- **sha256/md5** - Package checksums
+- **license** - Expected license
+- **file-name** - Specific package file
+
+## Build Strings
+
+Build strings identify specific builds of the same package version, especially for:
+
+- **Hardware acceleration** - CPU vs GPU/CUDA builds
+- **Python versions** - Different Python interpreter builds
+- **Compiler variants** - Different compiler versions
+
+A build string typically looks like: `py311h43a39b2_0`
+
+- `py311` - Python version indicator
+- `h43a39b2` - Build configuration hash
+- `_0` - Build number
+
+### Common Build Patterns
+
+```bash
+# Match any CUDA build
+pixi add "pytorch=*=cuda*"
+
+# Match Python 3.11 builds
+pixi add "numpy=*=py311*"
+
+# Specific Python version build
+pixi add "scipy[build='py311h*']"
+```
+
+```toml
+[dependencies]
+# CUDA build
+pytorch = { version = "2.0.*", build = "cuda*" }
+
+# Specific Python version
+numpy = { version = "1.24.*", build = "py311*" }
+
+# CPU-only build
+tensorflow = { version = "2.13.*", build = "cpu*" }
+```
+
+<Warning>
+Build strings are platform-specific. A build like `py311h43a39b2_0` might only exist for certain platforms.
+</Warning>
+
+## Build Numbers
+
+Build numbers increment when a package is rebuilt with the same version:
+
+```bash
+# Specific build number
+pixi add "python[version='3.11.0', build_number='1']"
+
+# Build number constraint
+pixi add "numpy[build_number='>=5']"
+```
+
+```toml
+[dependencies]
+python = { version = "3.11.0", build-number = ">=1" }
+```
+
+<Accordion title="When to use build numbers">
+Use build numbers when:
+- A package was rebuilt to fix compilation issues
+- You need a specific rebuild with bug fixes
+- Creating reproducible environments requiring exact builds
+</Accordion>
+
+## Channels
+
+Channels are repositories where conda packages are hosted:
+
+```bash
+# Specific channel by name
+pixi add "pytorch[channel='pytorch']"
+
+# Channel URL
+pixi add "custom-package[channel='https://prefix.dev/my-channel']"
+
+# Shorthand with ::
+pixi add pytorch::pytorch
+pixi add https://prefix.dev/my-channel::custom-package
+```
+
+```toml
+[dependencies]
+pytorch = { version = "2.0.*", channel = "pytorch" }
+custom-package = { channel = "https://prefix.dev/my-channel" }
+```
+
+Channels must be listed in workspace configuration:
+
+```toml
+[workspace]
+channels = ["conda-forge", "pytorch", "nvidia"]
+```
+
+Or add via CLI:
+
+```bash
+pixi workspace channel add pytorch
+```
+
+## Package Checksums
+
+Verify package integrity with checksums:
+
+```toml
+[dependencies]
+numpy = {
+  version = "1.21.0",
+  sha256 = "abc123...",
+  md5 = "def456..."
+}
+```
+
+When specified, Pixi:
+- Verifies downloaded packages match the checksum
+- Fails installation if checksums don't match
+- Ensures you get the exact package expected
+
+<Tip>
+Prefer SHA256 over MD5 for better security.
+</Tip>
+
+## Source Packages
+
+<Warning>
+`pixi-build` is a preview feature and will change before stabilization.
+</Warning>
+
+### Path-Based Sources
+
+```toml
+[dependencies]
+my-lib = { path = "../my-lib" }
+```
+
+### Git-Based Sources
+
+```toml
+[dependencies]
+my-package = {
+  git = "https://github.com/user/repo",
+  branch = "main"
+}
+
+another-package = {
+  git = "https://github.com/user/repo",
+  tag = "v1.0.0",
+  subdirectory = "packages/subpkg"
+}
+
+specific-commit = {
+  git = "https://github.com/user/repo",
+  rev = "abc123def456"
+}
+```
+
+Available git fields:
+- **git** - Repository URL
+- **branch** - Branch name
+- **tag** - Git tag
+- **rev** - Specific commit SHA
+- **subdirectory** - Path within repository
+
+## PyPI Package Specifications
+
+Pixi supports PyPI packages using [PEP 440 version specifiers](https://peps.python.org/pep-0440/).
+
+### Command Line Syntax
+
+```bash
+# Simple package
+pixi add --pypi requests
+
+# Specific version
+pixi add --pypi "requests==2.31.0"
+
+# Version range
+pixi add --pypi "requests>=2.28,<3.0"
+
+# With extras
+pixi add --pypi "requests[security,socks]"
+
+# From URL
+pixi add --pypi "requests @ https://files.pythonhosted.org/.../requests-2.31.0-py3-none-any.whl"
+
+# From git
+pixi add --pypi "requests @ git+https://github.com/psf/requests.git@v2.31.0"
+pixi add --pypi requests --git https://github.com/psf/requests.git --tag v2.31.0
+pixi add --pypi requests --git https://github.com/psf/requests.git --branch main
+pixi add --pypi requests --git https://github.com/psf/requests.git --rev abc123
+```
+
+### TOML Mapping Syntax
+
+```toml
+[pypi-dependencies]
+# Simple version
+requests = ">=2.28,<3.0"
+
+# With extras
+requests = { version = ">=2.28", extras = ["security", "socks"] }
+
+# From URL
+custom-package = { url = "https://example.com/package.whl" }
+
+# From git
+dev-package = { git = "https://github.com/user/repo", branch = "main" }
+
+# Editable local install
+my-package = { path = ".", editable = true }
+```
+
+## Real-World Examples
+
+### Machine Learning with CUDA
+
+```toml
+[workspace]
+channels = ["conda-forge", "pytorch", "nvidia"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = "3.11.*"
+# PyTorch with CUDA 12.1 build
+pytorch = { version = "2.0.*", build = "cuda121*", channel = "pytorch" }
+torchvision = { version = "0.15.*", build = "cuda121*", channel = "pytorch" }
+cuda-toolkit = { version = "12.1.*", channel = "nvidia" }
+
+[pypi-dependencies]
+transformers = ">=4.30"
+```
+
+### Multi-Python Version Testing
+
+```toml
+[workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64", "win-64"]
+
+[feature.py39.dependencies]
+python = { version = "3.9.*", build = "*cpython" }
+
+[feature.py310.dependencies]
+python = { version = "3.10.*", build = "*cpython" }
+
+[feature.py311.dependencies]
+python = { version = "3.11.*", build = "*cpython" }
+
+[dependencies]
+numpy = { version = ">=1.21", build = "py3*" }
+
+[environments]
+py39 = ["py39"]
+py310 = ["py310"]
+py311 = ["py311"]
+```
+
+### Mixing Conda and PyPI
+
+```toml
+[dependencies]
+# Base Python from conda
+python = ">=3.9"
+# Scientific stack from conda (faster, binary)
+numpy = ">=1.21"
+scipy = ">=1.7"
+pandas = ">=1.3"
+
+[pypi-dependencies]
+# Pure Python packages from PyPI
+requests = ">=2.28"
+click = ">=8.0"
+# Development tools
+black = "*"
+ruff = "*"
+```
+
+## Best Practices
+
+**Pin Critical Dependencies**
+```toml
+[dependencies]
+# Pin exact versions for reproducibility
+python = "3.11.0"
+numpy = "1.24.0"
+```
+
+**Use Version Ranges for Libraries**
+```toml
+[dependencies]
+# Allow updates within compatibility range
+requests = ">=2.28,<3.0"
+pandas = ">=1.5,<2.0"
+```
+
+**Specify Builds for Hardware**
+```toml
+[dependencies]
+# Explicit CUDA build
+pytorch = { version = "2.0.*", build = "cuda*" }
+# Explicit CPU build
+tensorflow = { version = "2.13.*", build = "cpu*" }
+```
+
+**Prefer Conda Over PyPI When Available**
+```toml
+# Good: Fast binary install
+[dependencies]
+numpy = "*"
+scipy = "*"
+
+# Avoid: Slower source builds
+# [pypi-dependencies]
+# numpy = "*"
+# scipy = "*"
+```
+
+**Document Package Sources**
+```toml
+[dependencies]
+# PyTorch from pytorch channel (required for CUDA builds)
+pytorch = { version = "2.0.*", channel = "pytorch" }
+
+# Custom internal package
+internal-lib = { channel = "https://conda.company.com" }
+```
+
+## Further Reading
+
+- [Pixi Manifest Reference](../reference/pixi_manifest.md#dependencies)
+- [Multi-Platform Configuration](./multi-platform.mdx)
+- [Conda Package Specification](https://conda.io/projects/conda/en/latest/user-guide/concepts/pkg-specs.html)
+- [PEP 440 Version Specifiers](https://peps.python.org/pep-0440/)

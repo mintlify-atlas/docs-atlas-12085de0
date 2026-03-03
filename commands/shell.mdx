@@ -1,0 +1,156 @@
+---
+title: pixi shell
+description: Start an interactive shell in a pixi environment
+---
+
+Start an interactive shell in a pixi environment. Run `exit` to leave the shell.
+
+## Usage
+
+```bash
+pixi shell [OPTIONS]
+```
+
+**Alias:** `pixi s`
+
+## Options
+
+<ParamField path="--manifest-path" type="path">
+  The path to the `pixi.toml` or `pyproject.toml` file.
+</ParamField>
+
+<ParamField path="--frozen" type="boolean">
+  Install the environment as defined in the lockfile, without updating it.
+</ParamField>
+
+<ParamField path="--locked" type="boolean">
+  Check if the lockfile is up-to-date before installing the environment. Errors if the lockfile is out-of-date.
+</ParamField>
+
+<ParamField path="--environment" type="string" shorthand="e">
+  The environment to activate in the shell.
+</ParamField>
+
+<ParamField path="--no-install" type="boolean">
+  Don't install the environment, only activate it.
+</ParamField>
+
+<ParamField path="--change-ps1" type="boolean" default="true">
+  Change the prompt to indicate the pixi environment (can be configured in the global config).
+</ParamField>
+
+## Examples
+
+### Start a shell in the default environment
+
+```bash
+pixi shell
+```
+
+### Start a shell in a specific environment
+
+```bash
+pixi shell --environment production
+```
+
+### Start a shell without updating the environment
+
+```bash
+pixi shell --frozen
+```
+
+## Supported Shells
+
+Pixi automatically detects and supports the following shells:
+
+### Unix/Linux/macOS
+- **Bash** - Default on most Linux systems
+- **Zsh** - Default on macOS
+- **Fish**
+- **Xonsh**
+- **Nushell**
+
+### Windows
+- **PowerShell** - Default
+- **Cmd.exe**
+- **Bash** (Git Bash, WSL)
+- **Nushell**
+
+<Note>
+  Pixi will use the shell from which it was invoked, or fall back to the system default shell.
+</Note>
+
+## Shell Prompt
+
+By default, pixi modifies your shell prompt to indicate you're in a pixi environment:
+
+```bash
+(myproject:default) user@machine ~/myproject $
+```
+
+You can disable this behavior:
+- Globally: Configure `change-ps1 = false` in your pixi configuration
+- Per command: Currently not configurable per-command, but you can use `pixi shell-hook` for custom integrations
+
+## Shell Completions
+
+If configured (`source-completion-scripts = true` in config), pixi will automatically source shell completions from the activated environment for supported shells.
+
+## Interactive Workflow
+
+```bash
+# Initialize a project
+pixi init myproject
+cd myproject
+
+# Add dependencies
+pixi add python cowpy
+
+# Start a shell
+pixi shell
+
+# Now you're in the activated environment
+cowpy "Thanks for using pixi"
+python --version
+
+# Exit the shell
+exit
+```
+
+<Tip>
+  You can use `pixi s` as a shorthand for `pixi shell`.
+</Tip>
+
+## Environment Activation
+
+When you start a shell:
+
+1. Pixi checks if the lockfile is up-to-date (unless `--frozen` is used)
+2. Installs the environment if needed (unless `--no-install` is used)
+3. Activates the environment with all necessary environment variables
+4. Starts an interactive shell
+5. Modifies the prompt (unless disabled)
+
+## Differences from `pixi run`
+
+- `pixi shell` starts an **interactive** shell session
+- `pixi run` executes a **single command** and exits
+- Both activate the same environment with the same variables
+
+## Using with Different Shells
+
+Pixi adapts to your shell automatically:
+
+```bash
+# Will use bash if that's your current shell
+bash
+pixi shell
+
+# Will use zsh if that's your current shell
+zsh
+pixi shell
+
+# Will use fish if that's your current shell
+fish
+pixi shell
+```

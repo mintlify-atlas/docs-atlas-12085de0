@@ -1,0 +1,283 @@
+---
+title: 'Container Usage'
+description: 'Deploy Pixi environments using Docker and container technologies'
+---
+
+Containerizing Pixi packages is an effective way to bring them into production environments using Docker or Podman.
+
+## Pixi Docker Images
+
+The official [`pixi-docker`](https://github.com/prefix-dev/pixi-docker) repository provides Docker images with Pixi pre-installed on various base images.
+
+### Available Images
+
+Images are available at [ghcr.io/prefix-dev/pixi](https://ghcr.io/prefix-dev/pixi):
+
+- `latest` - Ubuntu Jammy (22.04)
+- `focal` - Ubuntu Focal (20.04)
+- `bullseye` - Debian Bullseye
+- `noble-cuda-12.9.1` - Ubuntu 24.04 with CUDA 12.9.1
+- `noble-cuda-13.0.0` - Ubuntu 24.04 with CUDA 13.0.0
+- ...and more
+
+<Note>
+For all available tags, see the [build script](https://github.com/prefix-dev/pixi-docker/blob/main/.github/workflows/build.yml).
+</Note>
+
+<Card title="Best Practices Blog Post" icon="book" href="https://tech.quantco.com/blog/pixi-production">
+  Learn best practices for shipping conda environments to production using Pixi and Docker
+</Card>
+
+## Multi-Stage Dockerfile Example
+
+This example demonstrates a production-ready multi-stage build that uses `pixi shell-hook` to avoid including Pixi in the final image:
+
+```dockerfile Dockerfile
+FROM ghcr.io/prefix-dev/pixi:0.41.4 AS build
+
+# Copy source code, pixi.toml and pixi.lock to the container
+WORKDIR /app
+COPY . .
+
+# Install dependencies to `/app/.pixi/envs/prod`
+# Use `--locked` to ensure the lockfile is up to date
+RUN pixi install --locked -e prod
+
+# Create the shell-hook bash script to activate the environment
+RUN pixi shell-hook -e prod -s bash > /shell-hook
+RUN echo "#!/bin/bash" > /app/entrypoint.sh
+RUN cat /shell-hook >> /app/entrypoint.sh
+
+# Extend the shell-hook script to run the command passed to the container
+RUN echo 'exec "$@"' >> /app/entrypoint.sh
+
+FROM ubuntu:24.04 AS production
+WORKDIR /app
+
+# Only copy the production environment into prod container
+# IMPORTANT: The prefix (path) must stay the same as in the build container
+COPY --from=build /app/.pixi/envs/prod /app/.pixi/envs/prod
+COPY --from=build --chmod=0755 /app/entrypoint.sh /app/entrypoint.sh
+
+# Copy your project code into the container
+COPY ./my_project /app/my_project
+
+EXPOSE 8000
+ENTRYPOINT [ "/app/entrypoint.sh" ]
+
+# Run your app inside the pixi environment
+CMD [ "uvicorn", "my_project:app", "--host", "0.0.0.0" ]
+```
+
+<Note>
+For more examples, see [pavelzw/pixi-docker-example](https://github.com/pavelzw/pixi-docker-example).
+</Note>
+
+## Advanced Docker Setup
+
+This example demonstrates using solve-groups and per-environment editability for optimal development and production workflows.
+
+### Project Structure
+
+```toml pyproject.toml
+[tool.pixi.workspace]
+name = "docker-project"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.dependencies]
+python = ">=3.11"
+gunicorn = "*"
+flask = "*"
+
+# Development environment with editable install
+[tool.pixi.feature.dev.pypi-dependencies]
+docker-project = { path = ".", editable = true }
+
+[tool.pixi.feature.dev.tasks]
+dev = "flask run --debug"
+
+# Production environment with non-editable install
+[tool.pixi.feature.prod.pypi-dependencies]
+docker-project = { path = ".", editable = false }
+
+[tool.pixi.feature.prod.tasks]
+build-wheel = "pip wheel --no-deps -w dist ."
+install-wheel = "pip install --no-deps --no-index --find-links dist docker-project"
+
+# Both environments use the same dependency versions via solve-group
+[tool.pixi.environments]
+default = { features = ["dev"], solve-group = "default" }
+prod = { features = ["prod"], solve-group = "default" }
+```
+
+### Multi-Stage Production Dockerfile
+
+```dockerfile Dockerfile
+FROM ghcr.io/prefix-dev/pixi:0.28.2 AS install
+
+# Create a dummy blank project
+WORKDIR /app/docker_project
+RUN touch __init__.py
+
+# Install dependencies
+WORKDIR /app
+COPY pyproject.toml .
+COPY pixi.lock .
+RUN --mount=type=cache,target=/root/.cache/rattler/cache,sharing=private \
+    pixi install
+
+# Build for production
+FROM install AS build
+
+# Create entrypoint script with environment activation
+RUN printf '#!/bin/sh\n%s\nexec "$@"' "$(pixi shell-hook -e prod)" > /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Build and install the Python wheel
+COPY . .
+RUN pixi run build-wheel
+RUN pixi run install-wheel
+
+# Final minimal production image
+FROM ubuntu:22.04 AS production
+
+# Copy only the production environment
+COPY --from=build /app/.pixi/envs/prod /app/.pixi/envs/prod
+COPY --from=build /entrypoint.sh /entrypoint.sh
+
+WORKDIR /app
+EXPOSE 8000
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["gunicorn", "docker_project:app", "-b", "0.0.0.0:8000"]
+```
+
+### Docker Compose for Development
+
+```yaml docker-compose.yml
+services:
+  pixi-example:
+    image: localhost/prefix-dev/docker-project:latest
+    build:
+      context: .
+      target: install
+    command: pixi run dev -h 0.0.0.0 -p 8000
+    ports:
+      - 8000:8000
+    volumes:
+      - ./docker_project:/app/docker_project:ro
+```
+
+### Usage Commands
+
+<Steps>
+  <Step title="Development with Docker Compose">
+    ```bash
+    docker compose up --build
+    ```
+    
+    This runs the development server with hot-reload enabled via the mounted volume.
+  </Step>
+  
+  <Step title="Production Build and Run">
+    ```bash
+    docker build -t pixi-docker .
+    docker run -p 8000:8000 pixi-docker
+    ```
+    
+    This creates an optimized production image without Pixi or development dependencies.
+  </Step>
+</Steps>
+
+## Key Concepts
+
+### Shell Hook
+
+The `pixi shell-hook` command generates shell code to activate the environment without requiring Pixi:
+
+```bash
+pixi shell-hook -e prod -s bash
+```
+
+Output:
+```bash
+export PATH="/app/.pixi/envs/prod/bin:$PATH"
+export CONDA_PREFIX="/app/.pixi/envs/prod"
+# ... additional environment variables
+```
+
+### Solve Groups
+
+Solve groups ensure that different environments (dev/prod) use identical dependency versions:
+
+```toml
+[tool.pixi.environments]
+default = { features = ["dev"], solve-group = "default" }
+prod = { features = ["prod"], solve-group = "default" }
+```
+
+This guarantees consistency between development and production.
+
+### Environment Editability
+
+- **Development**: Use `editable = true` for fast iteration without rebuilds
+- **Production**: Use `editable = false` for a clean, optimized installation
+
+## Best Practices
+
+<Card title="Multi-Stage Builds" icon="layer-group">
+Use multi-stage builds to minimize final image size by excluding build tools and Pixi itself.
+</Card>
+
+<Card title="Lock Files" icon="lock">
+Always use `--locked` flag to ensure reproducible builds with exact dependency versions.
+</Card>
+
+<Card title="Layer Caching" icon="database">
+Copy `pixi.toml` and `pixi.lock` before source code to leverage Docker's layer caching.
+</Card>
+
+<Card title="Path Consistency" icon="route">
+Keep the environment path identical between build and runtime stages for proper activation.
+</Card>
+
+<Card title="Minimal Base Images" icon="minimize">
+Use minimal base images like Ubuntu or Debian for smaller final image sizes.
+</Card>
+
+## Troubleshooting
+
+### Environment Not Activating
+
+Ensure the prefix path remains the same between build and runtime:
+
+```dockerfile
+# Build stage
+WORKDIR /app
+RUN pixi install -e prod  # Creates /app/.pixi/envs/prod
+
+# Runtime stage
+COPY --from=build /app/.pixi/envs/prod /app/.pixi/envs/prod  # Same path
+```
+
+### Missing Dependencies
+
+Verify all runtime dependencies are in the production environment, not just development:
+
+```toml
+[tool.pixi.dependencies]  # Available in all environments
+python = ">=3.11"
+gunicorn = "*"
+
+[tool.pixi.feature.dev.dependencies]  # Only in dev
+pytest = "*"
+```
+
+### Large Image Size
+
+Use multi-stage builds and avoid including:
+- Pixi binary in final image
+- Development dependencies
+- Build tools and compilers
+- Source code if only wheels are needed

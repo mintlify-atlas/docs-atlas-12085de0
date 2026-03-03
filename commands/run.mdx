@@ -1,0 +1,164 @@
+---
+title: pixi run
+description: Run tasks in the pixi environment
+---
+
+Runs a task or command in the pixi environment. This command activates the environment and executes the specified task using the deno_task_shell.
+
+`pixi run` will automatically update the lockfile and install the environment if required.
+
+## Usage
+
+```bash
+pixi run [OPTIONS] [TASK]...
+```
+
+**Alias:** `pixi r`
+
+## Arguments
+
+<ParamField path="TASK" type="string">
+  The pixi task or shell command you want to run in the workspace's environment. Can be an executable in the environment's PATH.
+  
+  If no task is specified, pixi will print all available tasks.
+</ParamField>
+
+## Options
+
+<ParamField path="--manifest-path" type="path">
+  The path to the `pixi.toml` or `pyproject.toml` file.
+</ParamField>
+
+<ParamField path="--frozen" type="boolean">
+  Install the environment as defined in the lockfile, without updating it.
+</ParamField>
+
+<ParamField path="--locked" type="boolean">
+  Check if the lockfile is up-to-date before installing the environment. Errors if the lockfile is out-of-date.
+</ParamField>
+
+<ParamField path="--environment" type="string" shorthand="e">
+  The environment to run the task in.
+</ParamField>
+
+<ParamField path="--executable" type="boolean" shorthand="x">
+  Execute the command as an executable without resolving Pixi tasks.
+  
+  Useful when a task name and an executable have the same name.
+</ParamField>
+
+<ParamField path="--clean-env" type="boolean">
+  Use a clean environment to run the task.
+  
+  This flag will ignore your current shell environment and use a bare minimum environment to activate the pixi environment in.
+</ParamField>
+
+<ParamField path="--skip-deps" type="boolean">
+  Don't run the dependencies of the task (tasks defined in the `depends-on` field).
+</ParamField>
+
+<ParamField path="--templated" type="boolean">
+  Enable template rendering for the command arguments.
+  
+  By default, arguments passed to `pixi run` on the command line are not processed by the template engine. Use this flag to enable rendering of template variables like `{{ pixi.platform }}`.
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean" shorthand="n">
+  Run the task in dry-run mode (only print the command that would run).
+</ParamField>
+
+<ParamField path="--no-install" type="boolean">
+  Don't install the environment, only activate it.
+</ParamField>
+
+## Examples
+
+### Run a task
+
+```bash
+pixi run test
+```
+
+### Run a task with arguments
+
+```bash
+pixi run build --release
+```
+
+### Run a command directly
+
+```bash
+pixi run python script.py
+```
+
+### List all available tasks
+
+```bash
+pixi run
+```
+
+<Note>
+  When no task is provided, pixi will display all tasks available in the current environment.
+</Note>
+
+### Run an executable by name when a task exists with the same name
+
+```bash
+pixi run --executable python
+```
+
+### Run a task in a specific environment
+
+```bash
+pixi run --environment production start
+```
+
+### Run a task with a clean environment
+
+```bash
+pixi run --clean-env test
+```
+
+### Skip task dependencies
+
+```bash
+pixi run --skip-deps build
+```
+
+### Dry-run mode
+
+```bash
+pixi run --dry-run deploy
+```
+
+This will print the commands that would be executed without actually running them.
+
+## Task Execution
+
+When you run a task:
+
+1. Pixi checks if the lockfile is up-to-date (unless `--frozen` is used)
+2. Installs the environment if needed (unless `--no-install` is used)
+3. Activates the environment
+4. Executes the task and any dependencies (unless `--skip-deps` is used)
+5. Returns the exit code of the task
+
+<Tip>
+  You can use `pixi r` as a shorthand for `pixi run`.
+</Tip>
+
+## Task Dependencies
+
+Tasks can depend on other tasks using the `depends-on` field. By default, pixi will run all dependencies before the main task. Use `--skip-deps` to skip this behavior.
+
+## Environment Variables
+
+Tasks run in an activated pixi environment with all environment variables set. Use `--clean-env` to start with a minimal environment.
+
+## Template Variables
+
+By default, template variables in command-line arguments are not rendered. Enable this with `--templated`:
+
+```bash
+pixi run --templated echo "{{ pixi.platform }}"
+```

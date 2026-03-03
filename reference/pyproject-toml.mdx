@@ -1,0 +1,343 @@
+---
+title: pyproject.toml with Pixi
+description: Using pixi configuration in pyproject.toml files
+---
+
+Pixi can read its configuration from `pyproject.toml` files, allowing Python projects to use a single manifest file for both Python packaging and pixi environment management.
+
+## Overview
+
+When using `pyproject.toml`, all pixi configuration goes under the `[tool.pixi]` section. This allows seamless integration with Python build tools like setuptools, poetry, or hatchling.
+
+## Basic Structure
+
+```toml
+[project]
+name = "my-python-package"
+version = "0.1.0"
+description = "A Python package with pixi"
+requires-python = ">=3.11"
+
+[tool.pixi.project]
+name = "my-python-package"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "win-64"]
+
+[tool.pixi.dependencies]
+python = "3.11.*"
+numpy = ">=1.20"
+
+[tool.pixi.pypi-dependencies]
+my-python-package = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+test = "pytest tests/"
+```
+
+## Configuration Sections
+
+All sections from `pixi.toml` are available under `[tool.pixi]`:
+
+### Workspace Configuration
+
+```toml
+[tool.pixi.project]  # or [tool.pixi.workspace]
+name = "my-package"
+version = "0.1.0"
+channels = ["conda-forge", "pytorch"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+```
+
+### Dependencies
+
+```toml
+[tool.pixi.dependencies]
+python = "3.11.*"
+numpy = ">=1.20"
+pandas = "*"
+
+[tool.pixi.pypi-dependencies]
+requests = ">=2.31"
+flask = "==3.0.*"
+
+# Make package itself available in editable mode
+my-package = { path = ".", editable = true }
+```
+
+### Tasks
+
+```toml
+[tool.pixi.tasks]
+test = "pytest tests/"
+lint = "ruff check src/"
+format = "ruff format src/"
+build = "python -m build"
+```
+
+### Environments
+
+```toml
+[tool.pixi.environments]
+default = ["default"]
+dev = ["default", "test", "lint"]
+prod = { features = ["default"], no-default-feature = false }
+```
+
+### Features
+
+```toml
+[tool.pixi.feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+
+[tool.pixi.feature.test.tasks]
+test = "pytest tests/"
+```
+
+## Complete Example
+
+Here's a complete `pyproject.toml` with both Python packaging and pixi configuration:
+
+```toml
+[project]
+name = "mylib"
+version = "0.1.0"
+description = "My Python library"
+requires-python = ">=3.11"
+authors = [
+    {name = "Jane Doe", email = "jane@example.com"},
+]
+readme = "README.md"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+]
+
+[project.urls]
+Homepage = "https://example.com"
+Repository = "https://github.com/example/mylib"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Pixi configuration
+[tool.pixi.project]
+name = "mylib"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+[tool.pixi.dependencies]
+python = "3.11.*"
+numpy = ">=1.20"
+scipy = ">=1.10"
+
+[tool.pixi.pypi-dependencies]
+mylib = { path = ".", editable = true }
+requests = ">=2.31"
+
+[tool.pixi.feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+pytest-xdist = "*"
+
+[tool.pixi.feature.test.tasks]
+test = "pytest tests/"
+test-cov = "pytest --cov=mylib tests/"
+
+[tool.pixi.feature.lint.dependencies]
+ruff = "*"
+mypy = "*"
+
+[tool.pixi.feature.lint.tasks]
+lint = "ruff check src/"
+format = "ruff format src/"
+typecheck = "mypy src/"
+
+[tool.pixi.feature.docs.dependencies]
+mkdocs = "*"
+mkdocs-material = "*"
+
+[tool.pixi.feature.docs.tasks]
+docs = "mkdocs serve"
+build-docs = "mkdocs build"
+
+[tool.pixi.environments]
+default = { features = ["default"] }
+dev = { features = ["default", "test", "lint", "docs"] }
+test = { features = ["test"] }
+
+[tool.pixi.tasks]
+build = "python -m build"
+clean = "rm -rf dist/ build/ *.egg-info"
+```
+
+## Editable Installation Pattern
+
+A common pattern is to install the package itself in editable mode:
+
+```toml
+[tool.pixi.dependencies]
+python = "3.11.*"
+numpy = "*"  # conda dependencies
+
+[tool.pixi.pypi-dependencies]
+my-package = { path = ".", editable = true }  # Install self in editable mode
+requests = "*"  # Other PyPI dependencies
+```
+
+This makes the package available for import while allowing live code changes.
+
+## Migration from pixi.toml
+
+To migrate from `pixi.toml` to `pyproject.toml`:
+
+1. **Copy sections** under `[tool.pixi]`:
+   ```toml
+   # pixi.toml
+   [project]
+   name = "mylib"
+   
+   # pyproject.toml
+   [tool.pixi.project]
+   name = "mylib"
+   ```
+
+2. **Rename `[project]`** to `[tool.pixi.project]`:
+   ```toml
+   [tool.pixi.project]  # Not [tool.pixi.workspace]
+   ```
+
+3. **Add Python build config** if needed:
+   ```toml
+   [build-system]
+   requires = ["hatchling"]
+   build-backend = "hatchling.build"
+   ```
+
+4. **Test the migration**:
+   ```bash
+   pixi install
+   pixi run test
+   ```
+
+## Advantages
+
+<Accordion title="Single manifest file">
+  No need to maintain both `pixi.toml` and `pyproject.toml`. Everything in one place.
+</Accordion>
+
+<Accordion title="Standard Python tooling">
+  Works with standard Python build tools (pip, build, twine, poetry, hatch).
+</Accordion>
+
+<Accordion title="Editable installs">
+  Easy to set up editable installs for development:
+  ```toml
+  [tool.pixi.pypi-dependencies]
+  mypackage = { path = ".", editable = true }
+  ```
+</Accordion>
+
+<Accordion title="PyPI publishing">
+  Can build and publish to PyPI while using pixi for development:
+  ```bash
+  pixi run build  # Build wheel
+  pixi run twine upload dist/*  # Publish to PyPI
+  ```
+</Accordion>
+
+## Limitations
+
+<Warning>
+  Not all pixi features work in `pyproject.toml`. Notable limitations:
+  
+  - No `[package]` section for building conda packages (use `pixi.toml` for this)
+  - Some tools may not understand `[tool.pixi]` sections
+  - Schema validation may not work in all editors
+</Warning>
+
+## Which Should I Use?
+
+<Accordion title="Use pyproject.toml when">
+  - You're building a Python package for PyPI
+  - You want a single manifest file
+  - Your project is primarily Python
+  - You're using Python build tools (setuptools, poetry, hatch)
+</Accordion>
+
+<Accordion title="Use pixi.toml when">
+  - You're building conda packages
+  - Your project uses multiple languages
+  - You need the `[package]` section
+  - You want better editor support for pixi-specific features
+  - Your project is not primarily Python
+</Accordion>
+
+<Accordion title="Use both when">
+  You can have both files! Pixi will use `pixi.toml` if present, otherwise falls back to `pyproject.toml`.
+  
+  Useful for:
+  - Publishing to both conda and PyPI
+  - Separating concerns (packaging vs environment management)
+</Accordion>
+
+## Examples from Real Projects
+
+### Data Science Library
+
+```toml
+[project]
+name = "ds-toolkit"
+version = "1.0.0"
+
+[tool.pixi.project]
+name = "ds-toolkit"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.dependencies]
+python = "3.11.*"
+numpy = "*"
+pandas = "*"
+scikit-learn = "*"
+
+[tool.pixi.pypi-dependencies]
+ds-toolkit = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+notebook = "jupyter lab"
+```
+
+### CLI Tool
+
+```toml
+[project]
+name = "mytool"
+version = "0.1.0"
+scripts = { mytool = "mytool.cli:main" }
+
+[tool.pixi.project]
+name = "mytool"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "win-64"]
+
+[tool.pixi.dependencies]
+python = "3.11.*"
+
+[tool.pixi.pypi-dependencies]
+mytool = { path = ".", editable = true }
+click = ">=8.0"
+rich = "*"
+
+[tool.pixi.tasks]
+dev = "mytool --help"
+test = "pytest tests/"
+```
+
+## Related
+
+- [pixi.toml Reference](/reference/pixi-toml) - Full pixi.toml documentation
+- [Python Integration](/tutorials/python) - Python-specific pixi features

@@ -1,0 +1,313 @@
+---
+title: pixi task
+description: Manage tasks in the workspace
+---
+
+Interact with tasks in the workspace. Tasks are commands that can be run with `pixi run`.
+
+## Usage
+
+```bash
+pixi task <SUBCOMMAND>
+```
+
+## Subcommands
+
+### add
+
+Add a new task to the workspace.
+
+```bash
+pixi task add [OPTIONS] <NAME> <COMMAND>...
+```
+
+**Alias:** `pixi task a`
+
+#### Arguments
+
+<ParamField path="NAME" type="string" required>
+  Task name.
+</ParamField>
+
+<ParamField path="COMMAND" type="string" required>
+  One or more commands to execute.
+</ParamField>
+
+#### Options
+
+<ParamField path="--depends-on" type="string">
+  Tasks that this task depends on. Multiple dependencies can be specified.
+</ParamField>
+
+<ParamField path="--platform" type="string" shorthand="p">
+  The platform for which the task should be added.
+</ParamField>
+
+<ParamField path="--feature" type="string" shorthand="f">
+  The feature for which the task should be added.
+</ParamField>
+
+<ParamField path="--cwd" type="path">
+  The working directory relative to the root of the workspace.
+</ParamField>
+
+<ParamField path="--env" type="key=value">
+  Environment variables to set. Use multiple times for multiple variables.
+  
+  Example: `--env KEY=value`
+</ParamField>
+
+<ParamField path="--default-environment" type="string">
+  Add a default environment for the task.
+</ParamField>
+
+<ParamField path="--description" type="string">
+  A description of the task.
+</ParamField>
+
+<ParamField path="--clean-env" type="boolean">
+  Isolate the task from the shell environment, only using the pixi environment.
+</ParamField>
+
+<ParamField path="--arg" type="string">
+  Arguments to pass to the task. Can be specified multiple times.
+</ParamField>
+
+#### Examples
+
+```bash
+# Add a simple task
+pixi task add test "pytest -s"
+
+# Add a task with dependencies
+pixi task add build "cargo build" --depends-on install-deps
+
+# Add a task with environment variables
+pixi task add start "python app.py" --env PORT=8000 --env DEBUG=true
+
+# Add a task with a custom working directory
+pixi task add docs "mkdocs serve" --cwd docs
+
+# Add a platform-specific task
+pixi task add build-windows "msbuild" --platform win-64
+
+# Add a task with a description
+pixi task add deploy "./deploy.sh" --description "Deploy to production"
+```
+
+### remove
+
+Remove a task from the workspace.
+
+```bash
+pixi task remove [OPTIONS] <TASK_NAME>...
+```
+
+**Aliases:** `pixi task rm`
+
+#### Arguments
+
+<ParamField path="TASK_NAME" type="string" required>
+  Task name(s) to remove. Multiple task names can be specified.
+</ParamField>
+
+#### Options
+
+<ParamField path="--platform" type="string" shorthand="p">
+  The platform for which the task should be removed.
+</ParamField>
+
+<ParamField path="--feature" type="string" shorthand="f">
+  The feature for which the task should be removed.
+</ParamField>
+
+#### Examples
+
+```bash
+# Remove a task
+pixi task remove test
+
+# Remove multiple tasks
+pixi task remove test build deploy
+
+# Remove a platform-specific task
+pixi task remove build-windows --platform win-64
+```
+
+### alias
+
+Create an alias for other tasks.
+
+```bash
+pixi task alias [OPTIONS] <ALIAS> <DEPENDS_ON>...
+```
+
+**Alias:** `pixi task @`
+
+#### Arguments
+
+<ParamField path="ALIAS" type="string" required>
+  The alias name.
+</ParamField>
+
+<ParamField path="DEPENDS_ON" type="string" required>
+  Tasks that this alias depends on (the tasks to execute).
+</ParamField>
+
+#### Options
+
+<ParamField path="--platform" type="string" shorthand="p">
+  The platform for which the alias should be added.
+</ParamField>
+
+<ParamField path="--description" type="string">
+  The description of the alias task.
+</ParamField>
+
+#### Examples
+
+```bash
+# Create an alias that runs multiple tasks
+pixi task alias ci test lint build
+
+# Create an alias with a description
+pixi task alias check test lint --description "Run all checks"
+```
+
+### list
+
+List all tasks in the workspace.
+
+```bash
+pixi task list [OPTIONS]
+```
+
+**Aliases:** `pixi task ls`, `pixi task l`
+
+#### Options
+
+<ParamField path="--summary" type="boolean" shorthand="s">
+  Show tasks available for this machine per environment.
+</ParamField>
+
+<ParamField path="--environment" type="string" shorthand="e">
+  The environment for which tasks should be listed. If not specified, the default environment is used.
+</ParamField>
+
+<ParamField path="--json" type="boolean">
+  Output the list of tasks as JSON instead of a tree.
+</ParamField>
+
+#### Examples
+
+```bash
+# List all tasks
+pixi task list
+
+# List tasks as a summary
+pixi task list --summary
+
+# List tasks for a specific environment
+pixi task list --environment production
+
+# List tasks as JSON
+pixi task list --json
+```
+
+## Task Configuration
+
+Tasks can be configured with various options in `pixi.toml`:
+
+```toml
+[tasks]
+test = "pytest tests/"
+
+build = { cmd = "cargo build --release", depends-on = ["install-deps"] }
+
+start = { cmd = "python app.py", env = { PORT = "8000" }, cwd = "src" }
+
+deploy = { cmd = "./deploy.sh", description = "Deploy to production" }
+
+ci = { depends-on = ["test", "lint", "build"] }
+```
+
+## Task Types
+
+### Plain Tasks
+
+Simple command strings:
+
+```toml
+[tasks]
+test = "pytest"
+```
+
+### Complex Tasks
+
+Tasks with additional configuration:
+
+```toml
+[tasks]
+build = { cmd = "cargo build", cwd = "rust", env = { RUST_BACKTRACE = "1" } }
+```
+
+### Alias Tasks
+
+Tasks that run other tasks:
+
+```toml
+[tasks]
+ci = { depends-on = ["test", "lint", "build"] }
+```
+
+## Task Execution Order
+
+When a task has dependencies, pixi executes them in topological order:
+
+```toml
+[tasks]
+install-deps = "pip install -r requirements.txt"
+test = { cmd = "pytest", depends-on = ["install-deps"] }
+build = { cmd = "python setup.py bdist_wheel", depends-on = ["test"] }
+```
+
+Running `pixi run build` will execute: `install-deps` → `test` → `build`
+
+<Note>
+  Use `pixi run --skip-deps` to skip running task dependencies.
+</Note>
+
+## Platform-Specific Tasks
+
+You can define tasks that only run on specific platforms:
+
+```toml
+[target.win-64.tasks]
+build = "msbuild"
+
+[target.linux-64.tasks]
+build = "make"
+```
+
+## Task Arguments
+
+Tasks can accept arguments:
+
+```toml
+[tasks]
+greet = { cmd = "echo Hello $1", args = ["name"] }
+```
+
+Run with: `pixi run greet World`
+
+<Tip>
+  Task commands can use template variables like `{{ pixi.platform }}` when run with `--templated`.
+</Tip>
+
+## Best Practices
+
+1. **Use descriptive names**: Choose clear, meaningful task names
+2. **Add descriptions**: Help others understand what each task does
+3. **Leverage dependencies**: Chain tasks together with `depends-on`
+4. **Keep tasks simple**: Break complex operations into multiple tasks
+5. **Use environment variables**: Make tasks configurable with env vars

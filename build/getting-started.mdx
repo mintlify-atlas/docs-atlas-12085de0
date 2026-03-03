@@ -1,0 +1,220 @@
+---
+title: Getting Started with Building Packages
+description: Learn how to build conda packages from source with Pixi
+---
+
+Pixi can build packages from source in addition to managing workflows and environments. This enables you to:
+
+- Build and upload packages to conda channels
+- Allow users to depend directly on source code that builds automatically
+- Manage multiple packages in a workspace
+- Create cross-language projects with unified tooling
+
+<Note>
+The `pixi-build` feature is currently in preview and has some limitations:
+
+1. Limited set of [build backends](./backends)
+2. Build backends may be missing some parameters/features
+3. Recursive source dependencies are not yet supported
+4. Workspace dependencies cannot be inherited
+</Note>
+
+## Quick Start
+
+Here's a complete example of a buildable Python package:
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+python_rich = { path = "." }
+
+[tasks]
+start = "rich-example-main"
+
+[package]
+name = "python_rich"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+
+[package.host-dependencies]
+hatchling = "==1.26.3"
+
+[package.run-dependencies]
+rich = "13.9.*"
+```
+
+## Understanding the Manifest Structure
+
+<Steps>
+
+### Enable the Preview Feature
+
+Since pixi-build is in preview, you must enable it explicitly:
+
+```toml
+[workspace]
+preview = ["pixi-build"]
+```
+
+<Note>
+The `[workspace]` section is currently an alias for `[project]` and specifies properties shared across all packages like name, channels, and platforms.
+</Note>
+
+### Define Your Package
+
+The `[package]` section specifies properties for the package you want to build:
+
+```toml
+[package]
+name = "python_rich"
+version = "0.1.0"
+```
+
+### Configure the Build Backend
+
+Specify which build backend to use and where to download it from:
+
+```toml
+[package.build]
+backend = { name = "pixi-build-python", version = "0.4.*" }
+```
+
+Build backends describe how to build a conda package for a specific language or build tool. See the [backends overview](./backends) for available options.
+
+### Add Host Dependencies
+
+Host dependencies are needed during the build process. For Python packages using PEP 517 backends:
+
+```toml
+[package.host-dependencies]
+hatchling = "==1.26.3"
+```
+
+<Note>
+The Python build backend (like `hatchling`) knows how to build a Python package, and `pixi-build-python` converts it into a conda package.
+</Note>
+
+Learn more about [dependency types](./dependency-types).
+
+### Specify Run Dependencies
+
+Add packages needed at runtime:
+
+```toml
+[package.run-dependencies]
+rich = "13.9.*"
+```
+
+### Add as Workspace Dependency
+
+Include your package in the workspace dependencies:
+
+```toml
+[dependencies]
+python_rich = { path = "." }
+```
+
+</Steps>
+
+## CLI Commands
+
+Once configured, you can use these commands:
+
+<CodeGroup>
+
+```bash Build a Package
+pixi build
+```
+
+```bash Install & Run
+pixi install
+pixi run start
+```
+
+```bash Test the Package
+pixi run test
+```
+
+</CodeGroup>
+
+<Note>
+- `pixi build` creates a `.conda` file from your package
+- Commands like `pixi install` and `pixi run` automatically build packages when a `path`, `git`, or `url` dependency is present
+</Note>
+
+## Complete Example Structure
+
+Here's what a complete project looks like:
+
+```text
+python_rich/
+├── pixi.toml           # Pixi manifest
+├── pyproject.toml      # Python project metadata
+├── .gitignore
+└── src/
+    └── python_rich/
+        └── __init__.py # Package code
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Python Packages" icon="python" href="./python-package">
+Build Python packages with pixi-build-python
+</Card>
+
+<Card title="C++ Packages" icon="cpp" href="./cpp-package">
+Build C++ packages with CMake
+</Card>
+
+<Card title="Workspaces" icon="folder-tree" href="./workspace">
+Manage multiple packages together
+</Card>
+
+<Card title="Build Backends" icon="gears" href="./backends">
+Explore available build backends
+</Card>
+
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Build fails with 'backend not found'">
+Make sure you've enabled the preview feature and specified the correct backend channels:
+
+```toml
+[workspace]
+preview = ["pixi-build"]
+
+[package.build.backend]
+channels = [
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
+]
+name = "pixi-build-python"
+version = "0.4.*"
+```
+</Accordion>
+
+<Accordion title="Dependencies not resolving">
+Check that:
+1. All dependencies are available in your specified channels
+2. Platform specifications match your target platforms
+3. Version constraints are compatible
+</Accordion>
+
+<Accordion title="Need to see the generated recipe?">
+Recipes are stored in `.pixi/build/work/<package-name>--<hash>/debug/recipe/`
+
+You can rebuild using:
+```bash
+rattler-build build --recipe .pixi/build/work/<package-name>--<hash>/debug/recipe/<variant_hash>/
+```
+</Accordion>

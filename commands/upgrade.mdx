@@ -1,0 +1,668 @@
+---
+title: pixi upgrade
+description: Upgrade dependencies to newer versions
+---
+
+The `pixi upgrade` command upgrades dependencies by loosening version constraints in the manifest, then updating the lock file.
+
+## Usage
+
+```bash
+pixi upgrade [OPTIONS] [PACKAGES]...
+```
+
+## Overview
+
+The `pixi upgrade` command:
+
+1. **Loosens** version constraints in the manifest
+2. **Updates** the lock file with newer versions
+3. **Modifies** `pixi.toml` or `pyproject.toml`
+4. **Installs** upgraded environments (unless `--no-install`)
+
+<Warning>
+  Unlike `pixi update`, `pixi upgrade` **modifies your manifest file**. Always review changes before committing.
+</Warning>
+
+## Upgrade vs Update
+
+| Feature | `pixi upgrade` | `pixi update` |
+|---------|----------------|---------------|
+| Modifies manifest | ✓ Yes | ✗ No |
+| Loosens constraints | ✓ Yes | ✗ No |
+| Updates lock file | ✓ Yes | ✓ Yes |
+| Can do major version bumps | ✓ Yes | ✗ No |
+| Safe for automation | ⚠ Caution | ✓ Yes |
+
+```bash
+# Update: Respects manifest constraints
+pixi update numpy  # 1.26.0 → 1.26.4 (within >=1.20,<2.0)
+
+# Upgrade: Loosens constraints
+pixi upgrade numpy  # 1.26.4 → 2.0.0 (updates manifest to >=2.0,<3)
+```
+
+## Arguments
+
+<ParamField path="PACKAGES" type="string">
+  Specific package(s) to upgrade. If not provided, all packages are upgraded.
+</ParamField>
+
+```bash
+pixi upgrade              # Upgrade all packages
+pixi upgrade numpy        # Upgrade only numpy
+pixi upgrade numpy pandas # Upgrade numpy and pandas
+```
+
+## Options
+
+### Feature Filter
+
+<ParamField path="--feature" type="string">
+  Upgrade packages in specific feature. If not specified, all features are upgraded.
+  
+  Short flag: `-f`
+</ParamField>
+
+```bash
+pixi upgrade --feature test
+pixi upgrade -f dev
+```
+
+### Package Exclusion
+
+<ParamField path="--exclude" type="string">
+  Exclude specific package(s) from upgrade. Can be specified multiple times. Conflicts with positional packages.
+</ParamField>
+
+```bash
+pixi upgrade --exclude python
+pixi upgrade --exclude python --exclude cuda
+```
+
+### Installation Control
+
+<ParamField path="--no-install" type="boolean" default="false">
+  Update manifest and lock file without installing.
+</ParamField>
+
+```bash
+pixi upgrade --no-install
+pixi install  # Install later
+```
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be upgraded without making changes.
+  
+  Short flag: `-n`
+</ParamField>
+
+```bash
+pixi upgrade --dry-run
+```
+
+### Lock File Usage
+
+<ParamField path="--frozen" type="boolean" default="false">
+  Don't update the lock file.
+  
+  Env: `PIXI_FROZEN`
+</ParamField>
+
+<ParamField path="--locked" type="boolean" default="false">
+  Require lock file to be up-to-date.
+  
+  Env: `PIXI_LOCKED`
+</ParamField>
+
+<Warning>
+  Using `--frozen` or `--locked` with `pixi upgrade` will not make changes or display results. Use `--dry-run` instead.
+</Warning>
+
+### Output Format
+
+<ParamField path="--json" type="boolean" default="false">
+  Output changes in JSON format.
+</ParamField>
+
+```bash
+pixi upgrade --json > changes.json
+```
+
+## Examples
+
+### Upgrade All Packages
+
+```bash
+pixi upgrade
+```
+
+Before `pixi.toml`:
+```toml
+[dependencies]
+python = "3.11.*"
+numpy = ">=1.20,<2.0"
+pandas = ">=1.5,<2.0"
+```
+
+Output:
+```
+✓ Upgraded 2 packages:
+  • numpy: 1.26.4 → 2.0.0
+  • pandas: 1.5.3 → 2.2.0
+```
+
+After `pixi.toml`:
+```toml
+[dependencies]
+python = "3.11.*"
+numpy = ">=2.0.0,<3"
+pandas = ">=2.2.0,<3"
+```
+
+### Upgrade Specific Package
+
+```bash
+pixi upgrade numpy
+```
+
+Before:
+```toml
+[dependencies]
+numpy = ">=1.20,<2.0"
+```
+
+Output:
+```
+✓ Upgraded numpy: 1.26.4 → 2.0.0
+```
+
+After:
+```toml
+[dependencies]
+numpy = ">=2.0.0,<3"
+```
+
+### Upgrade Multiple Packages
+
+```bash
+pixi upgrade numpy pandas
+```
+
+Output:
+```
+✓ Upgraded 2 packages:
+  • numpy: 1.26.4 → 2.0.0
+  • pandas: 1.5.3 → 2.2.0
+```
+
+### Upgrade with Exclusions
+
+```bash
+pixi upgrade --exclude python --exclude cuda
+```
+
+Upgrades all packages except `python` and `cuda`.
+
+### Upgrade Specific Feature
+
+```bash
+pixi upgrade --feature test
+```
+
+Before:
+```toml
+[feature.test.dependencies]
+pytest = ">=7.0,<8"
+pytest-cov = ">=4.0,<5"
+```
+
+Output:
+```
+✓ Upgraded test feature:
+  • pytest: 7.4.0 → 8.0.0
+  • pytest-cov: 4.1.0 → 5.0.0
+```
+
+After:
+```toml
+[feature.test.dependencies]
+pytest = ">=8.0.0,<9"
+pytest-cov = ">=5.0.0,<6"
+```
+
+### Dry Run
+
+Preview changes without modifying files:
+
+```bash
+pixi upgrade --dry-run
+```
+
+Output:
+```
+Would upgrade 3 packages:
+  • numpy: 1.26.4 → 2.0.0
+  • pandas: 1.5.3 → 2.2.0
+  • scipy: 1.11.0 → 1.13.0
+
+No files would be modified
+```
+
+### JSON Output
+
+```bash
+pixi upgrade --json
+```
+
+Output:
+```json
+{
+  "version": "1",
+  "environments": {
+    "default": {
+      "linux-64": {
+        "updated": [
+          {
+            "name": "numpy",
+            "before": "1.26.4",
+            "after": "2.0.0"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+### No Upgrades Available
+
+```bash
+pixi upgrade
+```
+
+Output:
+```
+✓ All packages are already up-to-date
+```
+
+## Upgrade Behavior
+
+### Version Specification Types
+
+#### Detailed Version Spec
+
+Before:
+```toml
+[dependencies]
+numpy = { version = ">=1.20,<2.0", channel = "conda-forge" }
+```
+
+After upgrade:
+```toml
+[dependencies]
+numpy = { version = ">=2.0.0,<3", channel = "conda-forge" }
+```
+
+Only `version` is updated, other fields preserved.
+
+#### Simple Version Spec
+
+Before:
+```toml
+[dependencies]
+numpy = ">=1.20,<2.0"
+```
+
+After upgrade:
+```toml
+[dependencies]
+numpy = ">=2.0.0,<3"
+```
+
+#### Non-Version Specs
+
+These are **not** upgraded:
+
+```toml
+[dependencies]
+mypackage = { git = "https://github.com/user/repo" }
+anotherpackage = { url = "https://example.com/package.tar.bz2" }
+localpackage = { path = "./local" }
+```
+
+Output:
+```
+✓ All packages are already up-to-date
+```
+
+### PyProject.toml Handling
+
+For `pyproject.toml` projects, pixi checks for `python` in `tool.pixi.dependencies`:
+
+```toml
+[project]
+dependencies = [
+  "numpy>=1.20",
+]
+
+[tool.pixi.dependencies]
+# python NOT specified here
+```
+
+```bash
+pixi upgrade python
+```
+
+Output:
+```
+✓ All packages are already up-to-date
+```
+
+Python is not upgraded because it's not in `tool.pixi.dependencies`.
+
+### Platform-Specific Upgrades
+
+For platform-specific dependencies:
+
+```toml
+[target.linux-64.dependencies]
+cuda = ">=11.8,<12"
+
+[target.osx-arm64.dependencies]
+metal = "*"
+```
+
+```bash
+pixi upgrade
+```
+
+Both `cuda` (linux-64) and `metal` (osx-arm64) are upgraded.
+
+After:
+```toml
+[target.linux-64.dependencies]
+cuda = ">=12.0.0,<13"
+
+[target.osx-arm64.dependencies]
+metal = ">=1.0.0,<2"
+```
+
+### Build Constraints
+
+For detailed specs with build strings:
+
+```toml
+[dependencies]
+pytorch = { version = ">=2.0,<3", build = "py311*" }
+```
+
+After upgrade:
+```toml
+[dependencies]
+pytorch = { version = ">=2.2.0,<3", build = "py311*" }
+```
+
+Wildcard build strings are preserved. Exact build strings are removed during upgrade.
+
+## Use Cases
+
+### Major Version Upgrade
+
+```bash
+# NumPy 1.x → 2.x
+pixi upgrade numpy
+pixi run pytest  # Test for breaking changes
+```
+
+### Refresh All Dependencies
+
+```bash
+pixi upgrade
+```
+
+Useful after:
+- Long time without updates
+- Major dependency releases
+- Security advisories
+
+### Upgrade Dev Dependencies Only
+
+```bash
+pixi upgrade --feature dev
+```
+
+```toml
+[feature.dev.dependencies]
+black = ">=23.0,<24"
+ruff = ">=0.1,<0.2"
+```
+
+After:
+```toml
+[feature.dev.dependencies]
+black = ">=24.0.0,<25"
+ruff = ">=0.3.0,<0.4"
+```
+
+### CI/CD Integration
+
+Automatic upgrade checks:
+
+```bash
+#!/bin/bash
+pixi upgrade --dry-run > upgrade-report.txt
+if grep -q "Would upgrade" upgrade-report.txt; then
+  echo "Upgrades available"
+  exit 1  # Notify team
+fi
+```
+
+### Gradual Migration
+
+Upgrade one package at a time:
+
+```bash
+pixi upgrade numpy --dry-run
+# Review changes
+pixi upgrade numpy
+pixi run pytest
+
+pixi upgrade pandas --dry-run
+# Review changes
+pixi upgrade pandas
+pixi run pytest
+```
+
+## Global Options
+
+<ParamField path="--manifest-path" type="string">
+  Path to `pixi.toml`, `pyproject.toml`, or workspace directory.
+  
+  Short flag: `-m`
+</ParamField>
+
+```bash
+pixi upgrade --manifest-path /path/to/project
+```
+
+## Config Options
+
+- `--auth-file <FILE>`: Authentication credentials
+- `--tls-no-verify`: Disable TLS verification
+- `--concurrent-solves <N>`: Max concurrent solves
+
+## Troubleshooting
+
+### Package Not Found
+
+Error: `could not find a package named 'numpyy'`
+
+Solution with suggestions:
+```
+Error: could not find a package named 'numpyy'
+Help: did you mean 'numpy', 'numba'?
+```
+
+### No Upgrades Available
+
+```bash
+pixi upgrade numpy
+```
+
+Output:
+```
+✓ All packages are already up-to-date
+```
+
+Possible reasons:
+- Already at latest version
+- Package is git/url/path spec (not upgradable)
+- Package not in selected feature
+
+### Solver Conflicts
+
+Error: `cannot solve dependencies`
+
+Solution: Upgrade dependencies together:
+
+```bash
+pixi upgrade numpy pandas scipy
+```
+
+Or use `--dry-run` to identify conflicts:
+
+```bash
+pixi upgrade --dry-run
+```
+
+### Manifest Not Modified
+
+If manifest is not updated, package might be:
+
+1. **Git dependency**: Not upgradable
+   ```toml
+   mypackage = { git = "..." }
+   ```
+
+2. **URL dependency**: Not upgradable
+   ```toml
+   mypackage = { url = "..." }
+   ```
+
+3. **Path dependency**: Not upgradable
+   ```toml
+   mypackage = { path = "..." }
+   ```
+
+4. **Python in pyproject.toml**: Must be in `tool.pixi.dependencies`
+
+## Best Practices
+
+1. **Always use --dry-run first**:
+   ```bash
+   pixi upgrade --dry-run
+   pixi upgrade  # If changes look good
+   ```
+
+2. **Test after upgrades**:
+   ```bash
+   pixi upgrade
+   pixi run pytest
+   pixi run myapp  # Integration testing
+   ```
+
+3. **Upgrade gradually** for large projects:
+   ```bash
+   pixi upgrade numpy --dry-run
+   pixi upgrade numpy
+   # Test
+   pixi upgrade pandas --dry-run
+   pixi upgrade pandas
+   # Test
+   ```
+
+4. **Review manifest changes**:
+   ```bash
+   pixi upgrade
+   git diff pixi.toml
+   ```
+
+5. **Commit manifest and lock together**:
+   ```bash
+   pixi upgrade
+   git add pixi.toml pixi.lock
+   git commit -m "Upgrade numpy to 2.0"
+   ```
+
+6. **Use feature isolation**:
+   ```bash
+   pixi upgrade --feature dev    # Safe
+   pixi upgrade --feature test   # Test changes
+   pixi upgrade                  # Production
+   ```
+
+7. **Document breaking changes**:
+   ```bash
+   pixi upgrade numpy
+   # Document in CHANGELOG.md
+   echo "- Upgraded NumPy to 2.0 (breaking changes in API)" >> CHANGELOG.md
+   ```
+
+## Common Workflows
+
+### Security Update Workflow
+
+```bash
+# Check for vulnerable package
+pixi upgrade requests --dry-run
+
+# Upgrade if safe
+pixi upgrade requests
+
+# Test
+pixi run pytest
+
+# Commit
+git add pixi.toml pixi.lock
+git commit -m "Security: Upgrade requests"
+```
+
+### Major Version Migration
+
+```bash
+# Upgrade in test environment first
+pixi upgrade numpy --feature test
+pixi run -e test pytest
+
+# If successful, upgrade in default
+pixi upgrade numpy
+pixi run pytest
+```
+
+### Quarterly Maintenance
+
+```bash
+# Upgrade all packages
+pixi upgrade --dry-run > upgrade-plan.txt
+
+# Review plan with team
+cat upgrade-plan.txt
+
+# Execute upgrade
+pixi upgrade
+
+# Full test suite
+pixi run pytest
+pixi run integration-tests
+
+# Commit
+git add pixi.toml pixi.lock
+git commit -m "Q1 2024 dependency upgrades"
+```
+
+## See Also
+
+- [pixi update](/commands/update) - Update without modifying manifest
+- [pixi add](/commands/add) - Add dependencies
+- [pixi remove](/commands/remove) - Remove dependencies

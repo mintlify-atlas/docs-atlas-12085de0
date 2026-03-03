@@ -1,0 +1,498 @@
+---
+title: pixi add
+description: Add dependencies to your pixi workspace
+---
+
+The `pixi add` command adds dependencies to your workspace manifest and updates the lock file.
+
+## Usage
+
+```bash
+pixi add [OPTIONS] <SPEC>...
+```
+
+## Arguments
+
+<ParamField path="SPEC" type="string" required>
+  The dependency to add. Can be:
+  - Package name: `numpy`
+  - Conda MatchSpec: `python=3.11.*`, `numpy>=1.20,<2.0`
+  - PyPI requirement: `requests==2.28.0` (with `--pypi`)
+  - Version spec: `python=3.11`, `numpy>=1.20`
+  
+  Multiple packages can be specified.
+</ParamField>
+
+## Basic Options
+
+### PyPI Dependencies
+
+<ParamField path="--pypi" type="boolean" default="false">
+  Add as a PyPI dependency instead of conda. Conflicts with `--host` and `--build`.
+</ParamField>
+
+```bash
+pixi add --pypi requests flask
+pixi add --pypi "boto3>=1.26"
+```
+
+### Platform-Specific Dependencies
+
+<ParamField path="--platform" type="string">
+  Platform for which the dependency should be added. Can be specified multiple times.
+  
+  Short flag: `-p`
+</ParamField>
+
+```bash
+pixi add python --platform linux-64 --platform osx-arm64
+pixi add cuda --platform linux-64
+```
+
+### Feature-Specific Dependencies
+
+<ParamField path="--feature" type="string" default="default">
+  Feature to add the dependency to.
+  
+  Short flag: `-f`
+</ParamField>
+
+```bash
+pixi add numpy --feature ml
+pixi add pytest --feature test
+```
+
+### Editable PyPI Packages
+
+<ParamField path="--editable" type="boolean" default="false">
+  Install PyPI package in editable mode. Requires `--pypi`.
+</ParamField>
+
+```bash
+pixi add --pypi --editable ./local-package
+pixi add --pypi --editable "mypackage @ file:///absolute/path"
+```
+
+## Dependency Type Options
+
+<Note>
+  These options are hidden by default but available for advanced use cases.
+</Note>
+
+<ParamField path="--host" type="boolean" default="false">
+  Add as a host dependency. Conflicts with `--build` and `--pypi`.
+</ParamField>
+
+<ParamField path="--build" type="boolean" default="false">
+  Add as a build dependency. Conflicts with `--host` and `--pypi`.
+</ParamField>
+
+```bash
+pixi add cmake --build
+pixi add python --host
+```
+
+## Git Dependencies
+
+### Git Repository
+
+<ParamField path="--git" type="string">
+  Git repository URL for the dependency.
+  
+  Short flag: `-g`
+</ParamField>
+
+```bash
+pixi add --git https://github.com/user/repo mypackage
+```
+
+### Git Reference
+
+<ParamField path="--branch" type="string">
+  Git branch to use. Requires `--git`.
+</ParamField>
+
+<ParamField path="--tag" type="string">
+  Git tag to use. Requires `--git`.
+</ParamField>
+
+<ParamField path="--rev" type="string">
+  Git revision (commit SHA) to use. Requires `--git`.
+</ParamField>
+
+```bash
+pixi add --git https://github.com/user/repo --branch main mypackage
+pixi add --git https://github.com/user/repo --tag v1.0.0 mypackage
+pixi add --git https://github.com/user/repo --rev abc123 mypackage
+```
+
+<Note>
+  Only one of `--branch`, `--tag`, or `--rev` can be specified.
+</Note>
+
+### Git Subdirectory
+
+<ParamField path="--subdir" type="string">
+  Subdirectory of the git repository. Requires `--git`.
+  
+  Short flag: `-s`
+</ParamField>
+
+```bash
+pixi add --git https://github.com/user/monorepo --subdir packages/mylib mylib
+```
+
+## Update Options
+
+### Skip Installation
+
+<ParamField path="--no-install" type="boolean" default="false">
+  Don't install the environment, only update the lock file.
+</ParamField>
+
+```bash
+pixi add numpy --no-install
+```
+
+### Lock File Usage
+
+<ParamField path="--frozen" type="boolean" default="false">
+  Install as defined in the lock file without updating it.
+  
+  Env: `PIXI_FROZEN`
+</ParamField>
+
+<ParamField path="--locked" type="boolean" default="false">
+  Check if lock file is up-to-date, abort if not.
+  
+  Env: `PIXI_LOCKED`
+</ParamField>
+
+```bash
+pixi add numpy --frozen
+pixi add numpy --locked
+```
+
+## Examples
+
+### Basic Package Addition
+
+Add the latest version:
+
+```bash
+pixi add python
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[dependencies]
+python = ">=3.12.3,<3.13"
+```
+
+### Specific Version
+
+```bash
+pixi add python=3.11
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[dependencies]
+python = "3.11.*"
+```
+
+### Version Range
+
+```bash
+pixi add "numpy>=1.20,<2.0"
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[dependencies]
+numpy = ">=1.20,<2.0"
+```
+
+### Multiple Packages
+
+```bash
+pixi add python pytest numpy pandas
+```
+
+### PyPI Packages
+
+```bash
+pixi add --pypi requests flask
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[pypi-dependencies]
+requests = "*"
+flask = "*"
+```
+
+### PyPI with Version
+
+```bash
+pixi add --pypi "requests==2.28.0"
+```
+
+Resulting `pyproject.toml` (if using pyproject format):
+
+```toml
+[project]
+dependencies = [
+  "requests==2.28.0",
+]
+```
+
+### Platform-Specific Package
+
+```bash
+pixi add cuda --platform linux-64
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[target.linux-64.dependencies]
+cuda = ">=12.0.0,<13"
+```
+
+### Feature-Specific Packages
+
+```bash
+pixi add pytest pytest-cov --feature test
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[feature.test.dependencies]
+pytest = ">=8.0.0,<9"
+pytest-cov = ">=4.0.0,<5"
+```
+
+### Git Repository
+
+```bash
+pixi add --git https://github.com/mamba-org/rattler rattler-py
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[dependencies]
+rattler-py = { git = "https://github.com/mamba-org/rattler" }
+```
+
+### Git with Branch
+
+```bash
+pixi add --git https://github.com/user/repo --branch develop mypackage
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[dependencies]
+mypackage = { git = "https://github.com/user/repo", branch = "develop" }
+```
+
+### Editable Local Package
+
+```bash
+pixi add --pypi --editable ./my-package
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[pypi-dependencies]
+my-package = { path = "./my-package", editable = true }
+```
+
+## Pinning Strategy
+
+The pinning strategy determines how version constraints are added. Configure globally:
+
+```toml title="~/.pixi/config.toml"
+pinning-strategy = "semver"  # default
+```
+
+Or via CLI:
+
+```bash
+pixi add python --pinning-strategy exact-version
+```
+
+### Strategy Options
+
+| Strategy | Example Input | Resulting Constraint |
+|----------|---------------|----------------------|
+| `no-pin` | `numpy` | `*` |
+| `semver` | `numpy=1.26.0` | `>=1.26.0,<2` (or `>=1.26.0,<1.27` for v0) |
+| `exact-version` | `numpy=1.26.0` | `==1.26.0` |
+| `major` | `numpy=1.26.0` | `>=1.26.0,<2` |
+| `minor` | `numpy=1.26.0` | `>=1.26.0,<1.27` |
+| `latest-up` | `numpy=1.26.0` | `>=1.26.0` |
+
+### Non-SemVer Packages
+
+These packages default to minor pinning:
+- Python
+- Rust  
+- Julia
+- GCC, GXX, GFortran
+- NodeJS, Deno
+- R, R-Base
+- Perl
+
+## PyProject.toml Behavior
+
+When using `pyproject.toml` format:
+
+### Default Feature
+
+```bash
+pixi add --pypi boto3
+```
+
+Adds to native `project.dependencies`:
+
+```toml
+[project]
+dependencies = [
+  "boto3",
+]
+```
+
+### Named Feature
+
+```bash
+pixi add --pypi boto3 --feature aws
+```
+
+Adds to `dependency-groups`:
+
+```toml
+[dependency-groups]
+aws = [
+  "boto3",
+]
+```
+
+### Platform or Editable
+
+With `--platform` or `--editable`, adds to pixi tables:
+
+```bash
+pixi add --pypi boto3 --platform linux-64
+```
+
+```toml
+[tool.pixi.target.linux-64.pypi-dependencies]
+boto3 = "*"
+```
+
+## Combining Options
+
+### Platform + Feature
+
+```bash
+pixi add cuda --platform linux-64 --feature gpu
+```
+
+### Multiple Platforms
+
+```bash
+pixi add python --platform linux-64 --platform osx-arm64 --platform win-64
+```
+
+### PyPI + Feature
+
+```bash
+pixi add --pypi pytest --feature test
+pixi add --pypi black --feature lint
+```
+
+## Global Options
+
+<ParamField path="--manifest-path" type="string">
+  Path to `pixi.toml`, `pyproject.toml`, or workspace directory.
+  
+  Short flag: `-m`
+</ParamField>
+
+```bash
+pixi add numpy --manifest-path /path/to/project
+```
+
+## Config Options
+
+These options override global configuration:
+
+- `--pinning-strategy <STRATEGY>`: Set pinning strategy
+- `--tls-no-verify`: Disable TLS verification
+- `--auth-file <FILE>`: Path to authentication file
+- `--pypi-keyring-provider <PROVIDER>`: Keyring provider for PyPI
+
+## Troubleshooting
+
+### Package Not Found
+
+Error: `package 'numpyy' not found`
+
+Solution: Check package name spelling:
+
+```bash
+pixi search numpy
+pixi add numpy
+```
+
+### Version Conflict
+
+Error: `cannot satisfy version constraint`
+
+Solution: Relax version constraints or check compatibility:
+
+```bash
+# Instead of
+pixi add "numpy==1.20.0"
+
+# Try
+pixi add "numpy>=1.20"
+```
+
+### Platform Not Supported
+
+Error: `package not available for platform`
+
+Solution: Check package availability or use different package:
+
+```bash
+pixi search numpy --platform osx-arm64
+```
+
+### PyPI and Conda Conflict
+
+Error: `cannot mix --pypi with --host or --build`
+
+Solution: Separate commands:
+
+```bash
+pixi add numpy              # Conda
+pixi add --pypi requests    # PyPI
+```
+
+## See Also
+
+- [pixi remove](/commands/remove) - Remove dependencies
+- [pixi install](/commands/install) - Install dependencies
+- [pixi update](/commands/update) - Update dependencies
+- [pixi upgrade](/commands/upgrade) - Upgrade dependencies

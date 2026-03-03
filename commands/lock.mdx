@@ -1,0 +1,140 @@
+---
+title: 'pixi lock'
+description: 'Update the lock file without installing packages'
+---
+
+Update the pixi.lock file without installing the environment.
+
+## Usage
+
+```bash
+pixi lock [OPTIONS]
+```
+
+## Description
+
+The `pixi lock` command updates the lockfile (`pixi.lock`) based on your manifest (`pixi.toml` or `pyproject.toml`) without installing packages into environments. This is useful when you want to:
+
+- Update package versions in the lock file
+- Verify that dependencies can be resolved
+- Prepare for installation on another machine
+- Run in CI to check for dependency conflicts
+
+## Options
+
+<ParamField path="--environment" type="string" short="e">
+  Update lock file for specific environment(s). Can be specified multiple times.
+  
+  ```bash
+  pixi lock --environment prod
+  pixi lock -e dev -e test
+  ```
+</ParamField>
+
+<ParamField path="--platform" type="string" short="p">
+  Update lock file for specific platform(s). Can be specified multiple times.
+  
+  ```bash
+  pixi lock --platform linux-64
+  pixi lock -p linux-64 -p osx-arm64
+  ```
+</ParamField>
+
+<ParamField path="--no-install" type="boolean">
+  Don't install the environment after updating the lock file (deprecated, this is now the default behavior).
+  
+  ```bash
+  pixi lock --no-install
+  ```
+</ParamField>
+
+## Examples
+
+### Update Lock File for All Environments
+
+```bash
+pixi lock
+```
+
+This updates the lock file for all environments and platforms defined in your manifest.
+
+### Update Specific Environment
+
+```bash
+pixi lock --environment production
+```
+
+Only update the lock file for the production environment.
+
+### Update Multiple Platforms
+
+```bash
+pixi lock --platform linux-64 --platform osx-arm64
+```
+
+Update the lock file for Linux and macOS ARM platforms only.
+
+### Check if Lock File is Up to Date
+
+```bash
+pixi lock
+```
+
+If the command succeeds without changes, your lock file is up to date with your manifest.
+
+## Lock File Behavior
+
+The lock file (`pixi.lock`) contains:
+- Exact package versions for all dependencies
+- Package URLs and checksums
+- Platform-specific package selections
+- Dependency graph for each environment
+
+<Note>
+The lock file should be committed to version control to ensure reproducible builds across different machines and CI environments.
+</Note>
+
+## Common Use Cases
+
+### CI/CD Pipeline
+
+```yaml
+- name: Update lock file
+  run: pixi lock
+  
+- name: Check for changes
+  run: git diff --exit-code pixi.lock
+```
+
+This ensures the lock file in your repository is up to date.
+
+### Before Installing on Another Machine
+
+```bash
+# On development machine
+pixi lock
+git add pixi.lock
+git commit -m "Update lock file"
+git push
+
+# On deployment machine
+git pull
+pixi install --frozen
+```
+
+The `--frozen` flag with `pixi install` ensures it uses the exact versions from the lock file.
+
+### After Changing Dependencies
+
+```bash
+pixi add numpy pandas
+pixi lock
+```
+
+Update the lock file after adding new dependencies to ensure all platforms are resolved.
+
+## Related Commands
+
+- [`pixi install`](/commands/install) - Install environments from the lock file
+- [`pixi update`](/commands/update) - Update dependencies and lock file
+- [`pixi upgrade`](/commands/upgrade) - Upgrade dependencies to newer versions

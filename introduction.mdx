@@ -1,0 +1,131 @@
+---
+title: Introduction to Pixi
+description: Fast, modern, and reproducible package management for developers
+---
+
+# Pixi: Package Management Made Easy
+
+Pixi is a cross-platform, multi-language package manager and workflow tool built on the foundation of the conda ecosystem. It provides developers with an exceptional experience similar to popular package managers like `cargo` or `npm`, but for any language.
+
+<Note>
+Pixi is ready for production! The file format is designed to be compatible with previous versions, ensuring you can rely on Pixi with peace of mind.
+</Note>
+
+## Why Pixi?
+
+<CardGroup cols={2}>
+  <Card title="Reproducible Environments" icon="lock">
+    Built-in lock files ensure your environments are isolated and easily recreated across machines. No more "works on my machine" problems.
+  </Card>
+  
+  <Card title="Multi-Language Support" icon="code">
+    Supports Python, C++, R, Rust, Node.js, and more using Conda packages. Over 30,000 packages available on conda-forge.
+  </Card>
+  
+  <Card title="Cross-Platform" icon="laptop">
+    Works seamlessly on Linux, Windows, macOS (including Apple Silicon), and more platforms.
+  </Card>
+  
+  <Card title="Built-In Task Runner" icon="play">
+    Define and run cross-platform tasks effortlessly. Chain commands, set dependencies, and manage complex workflows.
+  </Card>
+  
+  <Card title="Disk Efficient" icon="hard-drive">
+    Environments share files through hard links or reflinks, so packages are stored only once on your system.
+  </Card>
+  
+  <Card title="PyPI Integration" icon="python">
+    Full support for PyPI packages through uv, seamlessly integrated with conda packages.
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Lock Files for Reproducibility
+
+Pixi always creates a `pixi.lock` file containing exact versions of all dependencies and their dependencies. This ensures reproducible environments across different machines and over time.
+
+### Multiple Environments in One Workspace
+
+Compose multiple environments in a single manifest file. Perfect for managing development, testing, and production environments together.
+
+### Global Tool Installation
+
+Install tools globally, safely isolated from each other. Pixi can replace `apt`, `homebrew`, or `winget` for managing your development tools:
+
+```bash
+pixi global install gh nvim ipython btop ripgrep
+```
+
+### Simple, Cargo-Like CLI
+
+Pixi provides a clean and intuitive command-line interface that feels familiar to developers:
+
+```bash
+pixi init my-project
+pixi add python numpy pytest
+pixi run test
+```
+
+## How Does Pixi Compare?
+
+| Core Features               | Pixi | Conda | Pip | Poetry | uv |
+|-----------------------------|------|-------|-----|--------|----|---
+| Installs Python             | ✅    | ✅     | ❌   | ❌      | ✅  |
+| Supports Multiple Languages | ✅    | ✅     | ❌   | ❌      | ❌  |
+| Lockfiles                   | ✅    | ❌     | ❌   | ✅      | ✅  |
+| Task Runner                 | ✅    | ❌     | ❌   | ❌      | ❌  |
+| Workspace Management        | ✅    | ❌     | ❌   | ✅      | ✅  |
+
+## Available Software
+
+Pixi defaults to the **conda-forge** repository, which contains over **30,000 packages** including:
+
+- **Python**: `python`, `scikit-learn`, `pytorch`, `numpy`, `pandas`
+- **C/C++**: `clang`, `boost`, `opencv`, `cmake`, `ninja`
+- **Java**: `openjdk`, `gradle`, `maven`
+- **Rust**: `rust`, `cargo-edit`, `cargo-insta`
+- **Node.js**: `nodejs`, `bun`, `pnpm`, `eslint`
+- **CLI Tools**: `git`, `gh`, `ripgrep`, `make`, `jq`
+
+Browse thousands more on [prefix.dev](https://prefix.dev/) or host your own channels.
+
+## Built with Rust
+
+Pixi is entirely written in Rust and built on top of the [rattler](https://github.com/conda/rattler) library, ensuring exceptional performance and reliability.
+
+## Get Started
+
+<CardGroup cols={3}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install Pixi on Linux, macOS, or Windows in seconds
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Create your first workspace and run your first task
+  </Card>
+  
+  <Card title="Basic Usage" icon="book" href="/basic-usage">
+    Learn the essential commands and workflows
+  </Card>
+</CardGroup>
+
+## What's Next?
+
+Some exciting features planned for upcoming releases:
+
+- **Build and publish** your project as a Conda package
+- Support for **dependencies from source**
+- More powerful global installation of packages for deterministic setups across machines
+
+## Community
+
+<CardGroup cols={2}>
+  <Card title="Discord" icon="discord" href="https://discord.gg/kKV8ZxyzY4">
+    Join our active community for help and discussion
+  </Card>
+  
+  <Card title="GitHub" icon="github" href="https://github.com/prefix-dev/pixi">
+    Star the project and contribute to development
+  </Card>
+</CardGroup>

@@ -1,0 +1,622 @@
+---
+title: Using pyproject.toml with Pixi
+description: Master pyproject.toml integration with Pixi for Python projects, including dependency management, build systems, and environment configuration.
+---
+
+Learn how to use `pyproject.toml` as your Pixi manifest file for Python projects, combining standard Python packaging with Pixi's powerful environment management.
+
+## Why pyproject.toml?
+
+Pixi supports both `pixi.toml` and `pyproject.toml` manifest formats. For Python projects, `pyproject.toml` is recommended because:
+
+- It's the standard format for Python projects
+- It integrates with existing Python tooling
+- It combines project metadata with Pixi configuration
+- Other Python developers will be familiar with it
+
+<Note>
+For non-Python projects, use `pixi.toml` instead.
+</Note>
+
+## Initial Setup
+
+<Steps>
+
+### Create a New Project
+
+Initialize a project with `pyproject.toml`:
+
+```bash
+pixi init my-project --format pyproject
+cd my-project
+```
+
+### Convert an Existing Project
+
+If you already have a `pyproject.toml`, initialize Pixi in that directory:
+
+```bash
+pixi init
+```
+
+Pixi will automatically:
+
+- Add a `[tool.pixi.workspace]` section
+- Add your project as an editable PyPI dependency
+- Update `.gitignore` and `.gitattributes`
+
+</Steps>
+
+## Project Structure
+
+A typical project structure looks like:
+
+```
+my-project/
+├── pyproject.toml
+├── src/
+│   └── my_project/
+│       └── __init__.py
+├── tests/
+│   └── test_my_project.py
+├── .pixi/
+│   └── envs/
+│       └── default/
+└── pixi.lock
+```
+
+<Tip>
+Pixi supports both [flat and src layouts](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/).
+</Tip>
+
+## Understanding pyproject.toml
+
+### Standard Project Metadata
+
+The `[project]` section defines standard Python metadata:
+
+```toml
+[project]
+name = "my-project"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "My awesome project"
+authors = [
+    { name = "Your Name", email = "you@example.com" }
+]
+dependencies = []
+```
+
+### Pixi Workspace Configuration
+
+Pixi configuration lives under `[tool.pixi]`:
+
+```toml
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+[tool.pixi.pypi-dependencies]
+my-project = { path = ".", editable = true }
+```
+
+### Build System
+
+Define how to build your package:
+
+```toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+```
+
+<Note>
+Pixi uses this when installing your package as an editable dependency. If omitted, it defaults to setuptools.
+</Note>
+
+## Python Version Management
+
+### Automatic Python Installation
+
+The `requires-python` field automatically manages Python:
+
+```toml
+[project]
+requires-python = ">=3.11"
+```
+
+This is equivalent to in `pixi.toml`:
+
+```toml
+[dependencies]
+python = ">=3.11"
+```
+
+Pixi automatically installs the appropriate Python interpreter - no system installation needed!
+
+### Version Constraints
+
+<CodeGroup>
+
+```toml Minimum Version
+[project]
+requires-python = ">=3.11"
+```
+
+```toml Version Range
+[project]
+requires-python = ">=3.11,<3.14"
+```
+
+```toml Exact Version
+[project]
+requires-python = "==3.12"
+```
+
+</CodeGroup>
+
+## Dependency Management
+
+### PyPI Dependencies
+
+Dependencies in the `[project]` section become PyPI dependencies:
+
+```toml
+[project]
+dependencies = [
+    "numpy",
+    "pandas>=2.0",
+    "matplotlib>=3.8,<4",
+]
+```
+
+Add dependencies using:
+
+```bash
+pixi add --pypi numpy pandas matplotlib
+```
+
+### Conda Dependencies
+
+Use `[tool.pixi.dependencies]` for conda packages:
+
+```toml
+[tool.pixi.dependencies]
+opencv = ">=4.9.0,<5"
+mkl = ">=2024.0.0,<2025"
+compilers = "*"
+```
+
+Add conda dependencies:
+
+```bash
+pixi add opencv mkl compilers
+```
+
+### Mixing Both Sources
+
+Pixi seamlessly handles packages from both sources:
+
+<Tabs>
+<Tab title="pyproject.toml">
+
+```toml
+[project]
+dependencies = [
+    "requests",
+    "httpx",
+]
+
+[tool.pixi.dependencies]
+numpy = ">=2.0.0,<3"
+matplotlib = ">=3.8.0,<4"
+```
+
+</Tab>
+<Tab title="Commands">
+
+```bash
+# Add PyPI packages
+pixi add --pypi requests httpx
+
+# Add conda packages
+pixi add numpy matplotlib
+```
+
+</Tab>
+</Tabs>
+
+### Priority Rules
+
+When the same package is in both sections:
+
+```toml
+[project]
+dependencies = ["numpy"]  # PyPI version
+
+[tool.pixi.dependencies]
+numpy = ">=2.0.0,<3"       # Conda version - this wins!
+```
+
+<Tip>
+Conda dependencies always take precedence over PyPI dependencies.
+</Tip>
+
+## Optional Dependencies and Features
+
+### Optional Dependencies (Legacy)
+
+Define optional dependency groups:
+
+```toml
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov"]
+docs = ["sphinx", "sphinx-rtd-theme"]
+dev = ["ruff", "mypy"]
+```
+
+Pixi automatically converts these to features:
+
+```bash
+pixi init
+```
+
+Result:
+
+```toml
+[tool.pixi.environments]
+default = { features = [], solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
+docs = { features = ["docs"], solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
+```
+
+### Dependency Groups (PEP 735)
+
+The modern approach using dependency groups:
+
+```toml
+[dependency-groups]
+test = ["pytest", "pytest-cov"]
+docs = ["sphinx"]
+dev = [
+    { include-group = "test" },
+    { include-group = "docs" },
+    "ruff",
+    "mypy",
+]
+```
+
+Add to a dependency group:
+
+```bash
+pixi add --pypi --feature test pytest pytest-cov
+```
+
+### Self-References
+
+Dependency groups can reference each other:
+
+```toml
+[project.optional-dependencies]
+test = ["pytest"]
+all = ["package2", "my_project[test]"]
+```
+
+## Environment Configuration
+
+### Single Environment
+
+By default, Pixi creates one environment:
+
+```toml
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.dependencies]
+numpy = "*"
+
+[tool.pixi.pypi-dependencies]
+my-project = { path = ".", editable = true }
+```
+
+### Multiple Environments
+
+Create separate environments for different purposes:
+
+```toml
+[tool.pixi.environments]
+default = { solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
+prod = { features = ["prod"], solve-group = "default", no-default-feature = true }
+```
+
+Add environments:
+
+```bash
+pixi workspace environment add test --feature test --solve-group default
+pixi workspace environment add prod --no-default-feature
+```
+
+### Solve Groups
+
+Solve groups ensure dependency versions are consistent across environments:
+
+```toml
+[tool.pixi.environments]
+default = { solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
+```
+
+<Tip>
+Environments in the same solve group share the same dependency versions, ensuring consistency between development and testing.
+</Tip>
+
+## Tasks
+
+### Define Tasks
+
+Create reusable commands:
+
+```toml
+[tool.pixi.tasks]
+start = "python -m my_project"
+lint = "ruff check ."
+format = "ruff format ."
+test = "pytest tests/"
+```
+
+Run tasks:
+
+```bash
+pixi run test
+pixi run lint
+pixi run format
+```
+
+### Feature-Specific Tasks
+
+Tasks can be scoped to features:
+
+```toml
+[tool.pixi.feature.test.tasks]
+test = "pytest"
+coverage = "pytest --cov=my_project tests/"
+```
+
+### Task Dependencies
+
+Tasks can depend on other tasks:
+
+```toml
+[tool.pixi.tasks]
+check = { depends-on = ["lint", "test"] }
+lint = "ruff check ."
+test = "pytest"
+```
+
+## Development Dependencies with tool.uv.sources
+
+For monorepo setups, use `[tool.uv.sources]` to reference local packages:
+
+### Project Structure
+
+```
+workspace/
+├── main_project/
+│   └── pyproject.toml
+├── package_a/
+│   └── pyproject.toml
+└── package_b/
+    └── pyproject.toml
+```
+
+### Main Project Configuration
+
+```toml
+# main_project/pyproject.toml
+[tool.pixi.pypi-dependencies]
+package-a = { path = "../package_a" }
+```
+
+### Package A Configuration
+
+```toml
+# package_a/pyproject.toml
+[project]
+name = "package-a"
+dependencies = ["flask", "package-b"]
+
+[tool.uv.sources]
+flask = { git = "https://github.com/pallets/flask", branch = "main" }
+package-b = { path = "../package_b" }
+```
+
+<Note>
+`[tool.uv.sources]` only works in dependencies, not in the main manifest.
+</Note>
+
+## Build System Options
+
+### Hatchling (Recommended)
+
+```toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+```
+
+Benefits:
+- Modern and fast
+- Minimal configuration
+- Good defaults for most projects
+
+### Setuptools
+
+```toml
+[build-system]
+requires = ["setuptools>=40.8.0"]
+build-backend = "setuptools.build_meta:__legacy__"
+```
+
+### Poetry
+
+```toml
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+```
+
+## Complete Example
+
+Here's a complete `pyproject.toml` for a production project:
+
+```toml
+[project]
+name = "my-app"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "A production-ready application"
+authors = [
+    { name = "Your Name", email = "you@example.com" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "flask>=3.0.0",
+    "requests>=2.31.0",
+]
+
+[dependency-groups]
+test = ["pytest", "pytest-cov"]
+dev = [{include-group = "test"}, "ruff", "mypy"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+[tool.pixi.dependencies]
+gunicorn = ">=21.2.0,<22"
+numpy = ">=2.0.0,<3"
+
+[tool.pixi.pypi-dependencies]
+my-app = { path = ".", editable = true }
+
+[tool.pixi.feature.dev.pypi-dependencies]
+my-app = { path = ".", editable = true }
+
+[tool.pixi.feature.prod.pypi-dependencies]
+my-app = { path = ".", editable = false }
+
+[tool.pixi.tasks]
+dev = "flask --app my_app:app run --debug"
+start = "gunicorn -w 4 my_app:app --bind :8000"
+lint = "ruff check ."
+format = "ruff format ."
+
+[tool.pixi.feature.test.tasks]
+test = "pytest"
+coverage = "pytest --cov=my_app tests/"
+
+[tool.pixi.environments]
+default = { features = ["dev"], solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
+prod = { features = ["prod"], solve-group = "default" }
+
+[tool.pixi.system-requirements]
+macos = "12.0"  # Required for some dependencies
+```
+
+## Best Practices
+
+<Tip>
+**Always include a build-system section:**
+Even if you're not distributing your package, it's required for editable installs.
+</Tip>
+
+<Tip>
+**Use dependency groups over optional-dependencies:**
+The PEP 735 dependency groups are more flexible and modern.
+</Tip>
+
+<Tip>
+**Prefer conda for system dependencies:**
+Use conda for packages with C/C++ dependencies, PyPI for pure Python packages.
+</Tip>
+
+<Tip>
+**Use solve groups for consistency:**
+Put all environments in the same solve group to ensure version consistency.
+</Tip>
+
+## Comparison with pixi.toml
+
+<CodeGroup>
+
+```toml pyproject.toml
+[project]
+name = "my-project"
+requires-python = ">=3.11"
+dependencies = ["numpy"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.dependencies]
+python = ">=3.11"
+```
+
+```toml pixi.toml (equivalent)
+[workspace]
+name = "my-project"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = ">=3.11"
+
+[pypi-dependencies]
+numpy = "*"
+```
+
+</CodeGroup>
+
+## Next Steps
+
+- Explore [Python development](/tutorials/python) workflows
+- Set up [multiple environments](/tutorials/multi-environment)
+- Learn about [importing environments](/tutorials/import-environments)
+
+## Troubleshooting
+
+### Build Backend Not Found
+
+If you see "build backend not found", add a `[build-system]` section:
+
+```toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+```
+
+### Editable Install Issues
+
+Ensure your project is in `[tool.pixi.pypi-dependencies]`:
+
+```toml
+[tool.pixi.pypi-dependencies]
+my-project = { path = ".", editable = true }
+```
+
+### Mixed Dependency Sources
+
+If a package is in both `[project.dependencies]` and `[tool.pixi.dependencies]`, the conda version takes precedence.

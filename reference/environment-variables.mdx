@@ -1,0 +1,364 @@
+---
+title: Environment Variables
+description: Environment variables that configure pixi behavior
+---
+
+Pixi respects various environment variables that control its behavior. This page documents all environment variables recognized by pixi.
+
+## Global Behavior
+
+### `PIXI_COLOR`
+
+<ParamField path="PIXI_COLOR" type="enum" default="auto">
+  Controls colored output in the terminal.
+  
+  **Values:**
+  - `auto` - Automatically detect if colors are supported
+  - `always` - Always use colors
+  - `never` - Never use colors
+  
+  ```bash
+  export PIXI_COLOR=never
+  pixi install
+  ```
+  
+  Can also be set via `--color` flag.
+</ParamField>
+
+### `PIXI_NO_PROGRESS`
+
+<ParamField path="PIXI_NO_PROGRESS" type="boolean" default="false">
+  Hide all progress bars. Always enabled if stderr is not a terminal.
+  
+  ```bash
+  export PIXI_NO_PROGRESS=true
+  pixi install
+  ```
+  
+  Can also be set via `--no-progress` flag.
+</ParamField>
+
+### `PIXI_NO_WRAP`
+
+<ParamField path="PIXI_NO_WRAP" type="boolean" default="false">
+  Disable line wrapping in error messages. Useful in CI environments.
+  
+  ```bash
+  export PIXI_NO_WRAP=true
+  ```
+</ParamField>
+
+## Lock File Behavior
+
+### `PIXI_FROZEN`
+
+<ParamField path="PIXI_FROZEN" type="boolean" default="false">
+  Install the environment as defined in the lockfile without updating it.
+  
+  ```bash
+  export PIXI_FROZEN=true
+  pixi install  # Uses existing lock file
+  ```
+  
+  Can also be set via `--frozen` flag.
+</ParamField>
+
+### `PIXI_LOCKED`
+
+<ParamField path="PIXI_LOCKED" type="boolean" default="false">
+  Check if lockfile is up-to-date before installing. Aborts if lockfile is outdated.
+  
+  ```bash
+  export PIXI_LOCKED=true
+  pixi install  # Fails if lock file is out of date
+  ```
+  
+  Can also be set via `--locked` flag.
+</ParamField>
+
+## Pixi Home Directory
+
+### `PIXI_HOME`
+
+<ParamField path="PIXI_HOME" type="path">
+  Override the default pixi home directory where global installations and manifests are stored.
+  
+  **Default locations:**
+  - Linux: `~/.pixi`
+  - macOS: `~/Library/Application Support/pixi`
+  - Windows: `%USERPROFILE%\.pixi`
+  
+  ```bash
+  export PIXI_HOME=/custom/pixi/home
+  pixi global install python
+  ```
+</ParamField>
+
+## Cache and Storage
+
+### `PIXI_CACHE_DIR`
+
+<ParamField path="PIXI_CACHE_DIR" type="path">
+  Override the default cache directory.
+  
+  **Default locations:**
+  - Linux: `~/.cache/rattler`
+  - macOS: `~/Library/Caches/rattler`
+  - Windows: `%LOCALAPPDATA%\rattler\Cache`
+  
+  ```bash
+  export PIXI_CACHE_DIR=/mnt/cache/pixi
+  ```
+</ParamField>
+
+## Authentication
+
+### `RATTLER_AUTH_FILE`
+
+<ParamField path="RATTLER_AUTH_FILE" type="path">
+  Override the default location for authentication credentials.
+  
+  **Default:** `~/.rattler/credentials.json`
+  
+  ```bash
+  export RATTLER_AUTH_FILE=/secure/location/credentials.json
+  pixi auth login https://prefix.dev
+  ```
+</ParamField>
+
+## Network and Proxy
+
+### `HTTP_PROXY` / `HTTPS_PROXY`
+
+<ParamField path="HTTP_PROXY" type="url">
+  HTTP/HTTPS proxy server to use for network requests.
+  
+  ```bash
+  export HTTP_PROXY=http://proxy.example.com:8080
+  export HTTPS_PROXY=http://proxy.example.com:8080
+  pixi install
+  ```
+</ParamField>
+
+### `NO_PROXY`
+
+<ParamField path="NO_PROXY" type="string">
+  Comma-separated list of hosts to exclude from proxying.
+  
+  ```bash
+  export NO_PROXY=localhost,127.0.0.1,.example.com
+  ```
+</ParamField>
+
+## Conda and Rattler
+
+### `CONDA_PREFIX`
+
+<ParamField path="CONDA_PREFIX" type="path">
+  Set by pixi when activating an environment. Points to the active environment directory.
+  
+  **Read by pixi:** This is set automatically by pixi and used by tools to detect the active environment.
+  
+  ```bash
+  # Inside a pixi environment
+  echo $CONDA_PREFIX
+  # /path/to/workspace/.pixi/envs/default
+  ```
+</ParamField>
+
+### `CONDA_DEFAULT_ENV`
+
+<ParamField path="CONDA_DEFAULT_ENV" type="string">
+  Name of the active conda environment. Set automatically by pixi.
+  
+  ```bash
+  # Inside a pixi environment
+  echo $CONDA_DEFAULT_ENV
+  # default
+  ```
+</ParamField>
+
+## Pixi-Specific Runtime Variables
+
+These variables are set by pixi when running tasks or activating environments.
+
+### `PIXI_ENVIRONMENT_NAME`
+
+<ParamField path="PIXI_ENVIRONMENT_NAME" type="string">
+  Name of the currently active pixi environment. Set by pixi during `pixi run` and `pixi shell`.
+  
+  ```bash
+  pixi run bash
+  echo $PIXI_ENVIRONMENT_NAME
+  # default
+  ```
+</ParamField>
+
+### `PIXI_WORKSPACE_ROOT`
+
+<ParamField path="PIXI_WORKSPACE_ROOT" type="path">
+  Root directory of the pixi workspace. Set during task execution.
+  
+  ```bash
+  pixi run bash
+  echo $PIXI_WORKSPACE_ROOT
+  # /path/to/workspace
+  ```
+</ParamField>
+
+### `PIXI_WORKSPACE_MANIFEST`
+
+<ParamField path="PIXI_WORKSPACE_MANIFEST" type="path">
+  Path to the workspace manifest file (pixi.toml or pyproject.toml).
+</ParamField>
+
+### `PIXI_WORKSPACE_VERSION`
+
+<ParamField path="PIXI_WORKSPACE_VERSION" type="string">
+  Version of the workspace from the manifest.
+</ParamField>
+
+### `PIXI_WORKSPACE_NAME`
+
+<ParamField path="PIXI_WORKSPACE_NAME" type="string">
+  Name of the workspace from the manifest.
+</ParamField>
+
+## CI/CD Environment
+
+### `CI`
+
+<ParamField path="CI" type="boolean">
+  Detected by pixi to adjust behavior in CI environments.
+  
+  **Values:** `1`, `true` (case-insensitive)
+  
+  **Effects:**
+  - Disables line wrapping in error messages
+  - Adjusts progress bar behavior
+  
+  ```bash
+  export CI=true
+  pixi install
+  ```
+</ParamField>
+
+## Editor Configuration
+
+### `EDITOR`
+
+<ParamField path="EDITOR" type="string" default="nano (Unix) / notepad (Windows)">
+  Default editor for `pixi config edit`.
+  
+  ```bash
+  export EDITOR=vim
+  pixi config edit
+  ```
+</ParamField>
+
+## Logging and Debugging
+
+### `RUST_LOG`
+
+<ParamField path="RUST_LOG" type="string">
+  Control pixi's internal logging level. Useful for debugging.
+  
+  **Levels:** `error`, `warn`, `info`, `debug`, `trace`
+  
+  ```bash
+  # Enable debug logging
+  export RUST_LOG=pixi=debug,rattler=debug
+  pixi install
+  
+  # Trace everything
+  export RUST_LOG=trace
+  pixi install
+  ```
+</ParamField>
+
+### `RUST_BACKTRACE`
+
+<ParamField path="RUST_BACKTRACE" type="enum">
+  Show backtraces for errors.
+  
+  **Values:**
+  - `0` - No backtrace
+  - `1` - Short backtrace
+  - `full` - Full backtrace
+  
+  ```bash
+  export RUST_BACKTRACE=1
+  pixi install
+  ```
+</ParamField>
+
+## Build System
+
+### `CARGO_TARGET_DIR`
+
+<ParamField path="CARGO_TARGET_DIR" type="path">
+  Override Rust build output directory. Can be set in pixi.toml activation.
+  
+  ```toml
+  [activation]
+  env.CARGO_TARGET_DIR = "target/pixi"
+  ```
+</ParamField>
+
+## Shell Integration
+
+### `_PIXI_PROMPT`
+
+<ParamField path="_PIXI_PROMPT" type="string">
+  Set by pixi shell on Windows to customize the command prompt.
+  
+  **Format:** `(pixi:{environment_name}) $P$G`
+</ParamField>
+
+## Example: CI Configuration
+
+Typical CI environment variable setup:
+
+```bash
+#!/bin/bash
+# CI setup for pixi
+
+export CI=true
+export PIXI_COLOR=never
+export PIXI_NO_PROGRESS=true
+export PIXI_FROZEN=true  # Don't update lock file in CI
+
+# Install dependencies
+pixi install
+
+# Run tests
+pixi run test
+```
+
+## Example: Custom Cache Location
+
+Use a shared cache location:
+
+```bash
+# Shared team cache
+export PIXI_CACHE_DIR=/mnt/shared/pixi-cache
+export RATTLER_AUTH_FILE=/mnt/shared/credentials.json
+
+pixi install
+```
+
+## Environment Variables in Tasks
+
+You can use environment variables in your pixi tasks:
+
+```toml
+[tasks]
+build = { cmd = "cargo build", env = { CARGO_TARGET_DIR = "target/custom" } }
+test = "pytest -v $PYTEST_ARGS"
+```
+
+## Related Configuration
+
+- [Configuration File](/reference/configuration) - File-based configuration
+- [CLI Options](/reference/cli-options) - Command-line options
+- [pixi config](/commands/config) - Manage configuration

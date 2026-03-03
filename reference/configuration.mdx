@@ -1,0 +1,466 @@
+---
+title: Global Configuration
+description: Global pixi configuration file reference
+---
+
+Pixi can be configured globally using configuration files. These settings affect all pixi commands and workspaces on your system.
+
+## Configuration Locations
+
+Pixi looks for configuration files in multiple locations, loaded in this order (later overrides earlier):
+
+1. **System configuration** (platform-dependent)
+2. **Global configuration** (user-level)
+3. **Local configuration** (workspace-level)
+4. **Environment variables**
+5. **CLI arguments**
+
+### Global Configuration Paths
+
+<Accordion title="Linux">
+  ```
+  ~/.config/pixi/config.toml
+  $XDG_CONFIG_HOME/pixi/config.toml  # If XDG_CONFIG_HOME is set
+  ```
+</Accordion>
+
+<Accordion title="macOS">
+  ```
+  ~/.config/pixi/config.toml
+  ~/Library/Application Support/pixi/config.toml
+  ```
+</Accordion>
+
+<Accordion title="Windows">
+  ```
+  %APPDATA%\pixi\config.toml
+  C:\Users\<username>\AppData\Roaming\pixi\config.toml
+  ```
+</Accordion>
+
+### Local Configuration
+
+```
+<workspace-root>/.pixi/config.toml
+```
+
+## Configuration Format
+
+Configuration files use TOML format:
+
+```toml
+# config.toml
+default-channels = ["conda-forge", "bioconda"]
+tls-no-verify = false
+
+[mirrors]
+"https://conda.anaconda.org/conda-forge" = [
+  "https://prefix.dev/conda-forge"
+]
+
+[pypi-config]
+index-url = "https://pypi.org/simple"
+extra-index-urls = ["https://my-pypi.example.com/simple"]
+
+[repodata-config]
+disable-jlap = false
+disable-bzip2 = false
+disable-zstd = false
+```
+
+## Configuration Options
+
+### `default-channels`
+
+<ParamField path="default-channels" type="array" default='["conda-forge"]'>
+  Default conda channels to use when channels are not specified in the workspace.
+  
+  ```toml
+  default-channels = ["conda-forge", "bioconda", "pytorch"]
+  ```
+  
+  Can also be set via:
+  ```bash
+  pixi config set default-channels '["conda-forge", "bioconda"]'
+  pixi config append default-channels pytorch
+  pixi config prepend default-channels my-channel
+  ```
+</ParamField>
+
+### `tls-no-verify`
+
+<ParamField path="tls-no-verify" type="boolean" default="false">
+  Disable TLS certificate verification. Use with caution!
+  
+  ```toml
+  tls-no-verify = true
+  ```
+  
+  <Warning>
+    Disabling TLS verification is insecure and should only be used for testing or in controlled environments.
+  </Warning>
+</ParamField>
+
+### `authentication-override-file`
+
+<ParamField path="authentication-override-file" type="path">
+  Override the default authentication credentials file location.
+  
+  **Default:** `~/.rattler/credentials.json`
+  
+  ```toml
+  authentication-override-file = "/secure/path/credentials.json"
+  ```
+  
+  Can also use environment variable:
+  ```bash
+  export RATTLER_AUTH_FILE=/custom/path/credentials.json
+  ```
+</ParamField>
+
+### `change-ps1`
+
+<ParamField path="change-ps1" type="boolean" default="true">
+  Whether to modify the shell prompt (PS1) when activating an environment.
+  
+  ```toml
+  change-ps1 = false  # Don't modify prompt
+  ```
+</ParamField>
+
+### `detached-environments`
+
+<ParamField path="detached-environments" type="path">
+  Directory to store environments outside workspace directories.
+  
+  ```toml
+  detached-environments = "/mnt/shared/pixi-envs"
+  ```
+  
+  Useful for:
+  - Shared environments across workspaces
+  - Network storage
+  - Faster rebuilds (keep environments between git clones)
+</ParamField>
+
+## Network Configuration
+
+### `[mirrors]`
+
+<ParamField path="mirrors" type="object">
+  Configure channel mirrors for faster downloads or local caching.
+  
+  ```toml
+  [mirrors]
+  # Mirror conda-forge
+  "https://conda.anaconda.org/conda-forge" = [
+    "https://prefix.dev/conda-forge",
+    "https://mirror.example.com/conda-forge"
+  ]
+  
+  # Mirror multiple channels
+  "https://repo.anaconda.com/pkgs/main" = [
+    "https://mirror1.example.com/main",
+    "https://mirror2.example.com/main"
+  ]
+  ```
+  
+  Pixi will try mirrors in order, falling back to the original if mirrors fail.
+</ParamField>
+
+### `[proxy-config]`
+
+<ParamField path="proxy-config" type="object">
+  HTTP/HTTPS proxy configuration.
+  
+  ```toml
+  [proxy-config]
+  http = "http://proxy.example.com:8080"
+  https = "http://proxy.example.com:8080"
+  no-proxy = ["localhost", "127.0.0.1", ".example.com"]
+  ```
+  
+  Can also use environment variables:
+  ```bash
+  export HTTP_PROXY=http://proxy.example.com:8080
+  export HTTPS_PROXY=http://proxy.example.com:8080
+  export NO_PROXY=localhost,127.0.0.1,.example.com
+  ```
+</ParamField>
+
+## PyPI Configuration
+
+### `[pypi-config]`
+
+<ParamField path="pypi-config" type="object">
+  PyPI index and package installation configuration.
+  
+  ```toml
+  [pypi-config]
+  index-url = "https://pypi.org/simple"
+  extra-index-urls = [
+    "https://my-pypi.example.com/simple",
+    "https://backup-pypi.example.com/simple"
+  ]
+  
+  # Index strategy
+  index-strategy = "first-index"  # or "unsafe-first-match", "unsafe-best-match"
+  
+  # Binary/build control
+  no-binary = ["numpy", "scipy"]  # Don't use wheels
+  no-build = ["tensorflow"]  # Don't build from source
+  no-build-isolation = ["pyproject-toml"]  # No isolated build
+  
+  # Prerelease handling
+  prerelease-mode = "disallow"  # or "allow", "if-necessary", "explicit"
+  ```
+</ParamField>
+
+#### `index-url`
+
+Primary PyPI index:
+
+```toml
+[pypi-config]
+index-url = "https://pypi.org/simple"
+```
+
+#### `extra-index-urls`
+
+Additional PyPI indexes:
+
+```toml
+[pypi-config]
+extra-index-urls = [
+  "https://my-company.example.com/simple",
+  "https://backup.example.com/simple"
+]
+```
+
+#### `index-strategy`
+
+How to search multiple indexes:
+
+- `first-index` (default) - Only search first index that has the package
+- `unsafe-first-match` - Use first match across all indexes
+- `unsafe-best-match` - Use best version across all indexes
+
+```toml
+[pypi-config]
+index-strategy = "first-index"
+```
+
+#### `no-binary`
+
+Don't use pre-built wheels:
+
+```toml
+[pypi-config]
+no-binary = ["numpy", "scipy"]  # Build these from source
+```
+
+Or disable all binaries:
+
+```toml
+[pypi-config]
+no-binary = true
+```
+
+#### `no-build`
+
+Don't build from source:
+
+```toml
+[pypi-config]
+no-build = ["tensorflow"]  # Only use wheels
+```
+
+#### `prerelease-mode`
+
+Handle pre-release versions:
+
+- `disallow` (default) - Don't use pre-releases
+- `allow` - Allow pre-releases
+- `if-necessary` - Use pre-releases if needed
+- `explicit` - Only use explicitly requested pre-releases
+
+```toml
+[pypi-config]
+prerelease-mode = "if-necessary"
+```
+
+## Repodata Configuration
+
+### `[repodata-config]`
+
+<ParamField path="repodata-config" type="object">
+  Control how channel repodata is fetched and cached.
+  
+  ```toml
+  [repodata-config]
+  disable-jlap = false  # Use JLAP compression
+  disable-bzip2 = false  # Use bzip2 compression
+  disable-zstd = false  # Use zstd compression
+  ```
+  
+  <Tip>
+    JLAP provides incremental updates to repodata, reducing bandwidth usage.
+  </Tip>
+</ParamField>
+
+## Complete Example
+
+Here's a complete configuration file with common settings:
+
+```toml
+# ~/.config/pixi/config.toml
+
+# Default channels
+default-channels = ["conda-forge", "bioconda"]
+
+# TLS
+tls-no-verify = false
+
+# Authentication
+authentication-override-file = "~/.pixi/credentials.json"
+
+# Shell
+change-ps1 = true
+
+# Detached environments (optional)
+# detached-environments = "~/.pixi/envs"
+
+# Channel mirrors
+[mirrors]
+"https://conda.anaconda.org/conda-forge" = [
+  "https://prefix.dev/conda-forge"
+]
+
+# Proxy (if needed)
+# [proxy-config]
+# http = "http://proxy.company.com:8080"
+# https = "http://proxy.company.com:8080"
+# no-proxy = ["localhost", "127.0.0.1", ".company.com"]
+
+# PyPI configuration
+[pypi-config]
+index-url = "https://pypi.org/simple"
+extra-index-urls = [
+  "https://my-company.example.com/simple"
+]
+index-strategy = "first-index"
+prerelease-mode = "if-necessary"
+
+# Repodata
+[repodata-config]
+disable-jlap = false
+```
+
+## Managing Configuration
+
+### View Configuration
+
+```bash
+# View all config
+pixi config list
+
+# View specific key
+pixi config list default-channels
+
+# View as JSON
+pixi config list --json
+```
+
+### Edit Configuration
+
+```bash
+# Edit global config
+pixi config edit --global
+
+# Edit local config
+pixi config edit --local
+
+# Use custom editor
+pixi config edit --editor vim
+```
+
+### Set Values
+
+```bash
+# Set a value
+pixi config set default-channels '["conda-forge"]'
+
+# Append to list
+pixi config append default-channels bioconda
+
+# Prepend to list
+pixi config prepend default-channels my-channel
+
+# Unset a value
+pixi config unset tls-no-verify
+```
+
+### Configuration Scopes
+
+```bash
+# Global (user-level)
+pixi config set --global default-channels '["conda-forge"]'
+
+# Local (workspace-level)
+pixi config set --local default-channels '["conda-forge", "bioconda"]'
+
+# System-wide
+pixi config set --system default-channels '["internal-channel"]'
+```
+
+## Use Cases
+
+### Corporate Environment
+
+```toml
+# Corporate proxy and mirrors
+default-channels = ["internal-conda"]
+
+[mirrors]
+"https://conda.anaconda.org/conda-forge" = [
+  "https://conda-mirror.company.com/conda-forge"
+]
+
+[proxy-config]
+http = "http://proxy.company.com:8080"
+https = "http://proxy.company.com:8080"
+no-proxy = [".company.com", "localhost"]
+
+[pypi-config]
+index-url = "https://pypi.company.com/simple"
+```
+
+### Development Machine
+
+```toml
+# Fast mirrors and local cache
+default-channels = ["conda-forge"]
+detached-environments = "/mnt/fast-ssd/pixi-envs"
+
+[mirrors]
+"https://conda.anaconda.org/conda-forge" = [
+  "https://prefix.dev/conda-forge"
+]
+```
+
+### CI/CD Server
+
+```toml
+# Minimal, reproducible builds
+default-channels = ["conda-forge"]
+change-ps1 = false
+
+[repodata-config]
+disable-jlap = true  # More reliable in CI
+```
+
+## Related
+
+- [`pixi config`](/commands/config) - Manage configuration
+- [Environment Variables](/reference/environment-variables) - Environment-based configuration
+- [CLI Options](/reference/cli-options) - Command-line configuration

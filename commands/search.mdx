@@ -1,0 +1,172 @@
+---
+title: pixi search
+---
+
+Search for conda packages across channels.
+
+## Usage
+
+```bash
+pixi search [OPTIONS] <PACKAGE>
+```
+
+## Description
+
+The `pixi search` command searches for conda packages across configured channels. It displays the latest version of each package by default, with options to show more versions and detailed package information.
+
+## Arguments
+
+<ParamField path="package" type="string" required>
+  MatchSpec of a package to search. Can include version constraints.
+  
+  ```bash
+  pixi search python
+  pixi search "numpy>=1.20"
+  pixi search "python=3.11.*"
+  ```
+</ParamField>
+
+## Options
+
+<ParamField path="--channel" type="string">
+  Additional channels to search (can be specified multiple times).
+  
+  ```bash
+  pixi search numpy --channel conda-forge
+  pixi search python --channel conda-forge --channel bioconda
+  ```
+</ParamField>
+
+<ParamField path="--platform" type="platform">
+  The platform to search for. By default, searches all platforms from the manifest (or all known platforms if no manifest is found).
+  
+  ```bash
+  pixi search numpy --platform linux-64
+  pixi search python --platform osx-arm64
+  ```
+</ParamField>
+
+<ParamField path="--limit" type="integer" default="5">
+  Limit the number of versions shown per package. Use `-1` for no limit.
+  
+  ```bash
+  pixi search numpy --limit 10
+  pixi search python --limit -1  # Show all versions
+  ```
+</ParamField>
+
+<ParamField path="--limit-packages" type="integer" default="5">
+  Limit the number of packages shown. Use `-1` for no limit.
+  
+  ```bash
+  pixi search "py*" --limit-packages 10
+  ```
+</ParamField>
+
+<ParamField path="--json" type="boolean">
+  Output in JSON format. Conflicts with `--limit` and `--limit-packages`.
+  
+  ```bash
+  pixi search numpy --json
+  ```
+</ParamField>
+
+## Examples
+
+### Simple package search
+
+Search for a package by name:
+
+```bash
+pixi search numpy
+```
+
+### Search with version constraint
+
+Search for packages matching a version requirement:
+
+```bash
+pixi search "python>=3.11,<3.12"
+```
+
+### Search specific channels
+
+Search in specific channels:
+
+```bash
+pixi search pytorch --channel pytorch --channel conda-forge
+```
+
+### Show all versions
+
+Display all available versions of a package:
+
+```bash
+pixi search numpy --limit -1
+```
+
+### Search for specific platform
+
+Search for packages available on a specific platform:
+
+```bash
+pixi search tensorflow --platform linux-64
+```
+
+### JSON output
+
+Get search results in JSON format for processing:
+
+```bash
+pixi search numpy --json | jq '.'
+```
+
+## Output Format
+
+### Single Package (Detailed View)
+
+When searching for a single package, detailed information is shown:
+
+```
+numpy-1.26.4-py311h64a7726_0
+--------------------------------
+
+Name              numpy
+Version           1.26.4
+Build             py311h64a7726_0
+Size              8.2 MiB
+License           BSD-3-Clause
+Timestamp         2024-02-05 14:32:08 UTC
+Subdir            linux-64
+File Name         numpy-1.26.4-py311h64a7726_0.conda
+URL               https://conda.anaconda.org/conda-forge/linux-64/numpy-1.26.4-py311h64a7726_0.conda
+MD5               a502c5e1906ee5daeb089e4304b9b09b
+SHA256            4c392a6c...
+
+Dependencies:
+ - libblas >=3.9.0,<4.0a0
+ - libcblas >=3.9.0,<4.0a0
+ - python >=3.11,<3.12.0a0
+```
+
+### Multiple Packages (Summary View)
+
+When searching returns multiple packages, a compact summary is shown:
+
+```
+numpy (245 versions)
+  1.26.4 py311h64a7726_0 [linux-64] conda-forge
+  1.26.3 py311h64a7726_0 [linux-64] conda-forge
+  1.26.2 py311h64a7726_0 [linux-64] conda-forge
+  ... and 242 more versions (use -l to show more)
+
+numpy-base (89 versions)
+  1.26.4 py311h0b4df6a_0 [linux-64] conda-forge
+  1.26.3 py311h0b4df6a_0 [linux-64] conda-forge
+  ... and 87 more versions (use -l to show more)
+```
+
+## Related Commands
+
+- [`pixi add`](/commands/add) - Add packages to your workspace
+- [`pixi info`](/commands/info) - Show package and environment information

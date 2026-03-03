@@ -1,0 +1,281 @@
+---
+title: pixi config
+---
+
+Manage pixi configuration settings.
+
+## Usage
+
+```bash
+pixi config <COMMAND>
+```
+
+## Description
+
+The `pixi config` command manages configuration settings at different levels:
+- **Local** - Workspace-specific config (`.pixi/config.toml`)
+- **Global** - User-level config (`~/.config/pixi/config.toml`)
+- **System** - System-wide config
+
+## Subcommands
+
+### `pixi config edit`
+
+Open the configuration file in an editor.
+
+```bash
+pixi config edit [OPTIONS]
+```
+
+**Options:**
+- `--local` - Edit workspace configuration
+- `--global` - Edit global configuration (default if not in a workspace)
+- `--system` - Edit system configuration
+- `--editor <EDITOR>` - Editor to use (defaults to `$EDITOR` or `nano`/`notepad`)
+
+### `pixi config list`
+
+List configuration values.
+
+```bash
+pixi config list [OPTIONS] [KEY]
+```
+
+**Arguments:**
+- `[KEY]` - Configuration key to show (shows all if not provided)
+
+**Options:**
+- `--json` - Output in JSON format
+- `--local` - Show workspace configuration
+- `--global` - Show global configuration
+- `--system` - Show system configuration
+
+### `pixi config set`
+
+Set a configuration value.
+
+```bash
+pixi config set [OPTIONS] <KEY> [VALUE]
+```
+
+**Arguments:**
+- `<KEY>` - Configuration key to set
+- `[VALUE]` - Configuration value (key will be unset if not provided)
+
+**Options:**
+- `--local` - Set in workspace configuration
+- `--global` - Set in global configuration
+- `--system` - Set in system configuration
+
+### `pixi config unset`
+
+Remove a configuration value.
+
+```bash
+pixi config unset [OPTIONS] <KEY>
+```
+
+### `pixi config append`
+
+Append a value to a list configuration key.
+
+```bash
+pixi config append [OPTIONS] <KEY> <VALUE>
+```
+
+### `pixi config prepend`
+
+Prepend a value to a list configuration key.
+
+```bash
+pixi config prepend [OPTIONS] <KEY> <VALUE>
+```
+
+## Configuration Keys
+
+### `default-channels`
+
+Default conda channels to use.
+
+```bash
+pixi config set default-channels '["conda-forge", "bioconda"]'
+pixi config append default-channels pytorch
+pixi config prepend default-channels my-channel
+```
+
+### `tls-no-verify`
+
+Disable TLS certificate verification.
+
+```bash
+pixi config set tls-no-verify true
+```
+
+### `authentication-override-file`
+
+Override the default authentication file location.
+
+```bash
+pixi config set authentication-override-file "/custom/path/credentials.json"
+```
+
+### `mirrors`
+
+Configure channel mirrors.
+
+```bash
+pixi config set mirrors '{"https://conda.anaconda.org": ["https://mirror.example.com"]}'
+```
+
+### `pypi-config`
+
+PyPI-related configuration.
+
+```bash
+pixi config set pypi-config.index-url "https://pypi.org/simple"
+pixi config append pypi-config.extra-index-urls "https://my-pypi.com/simple"
+```
+
+### `repodata-config`
+
+Repodata fetching configuration.
+
+```bash
+pixi config set repodata-config '{"disable-jlap": true}'
+```
+
+## Examples
+
+### View all configuration
+
+List all configuration values:
+
+```bash
+pixi config list
+```
+
+### View specific configuration
+
+Show a single configuration key:
+
+```bash
+pixi config list default-channels
+```
+
+Output:
+```toml
+default-channels = ["conda-forge"]
+```
+
+### Edit global config
+
+Open global configuration in editor:
+
+```bash
+pixi config edit --global
+```
+
+### Set default channels
+
+Configure default channels:
+
+```bash
+# Set channels list
+pixi config set default-channels '["conda-forge", "bioconda"]'
+
+# Add a channel to the end
+pixi config append default-channels pytorch
+
+# Add a channel to the beginning
+pixi config prepend default-channels my-priority-channel
+```
+
+### Configure PyPI index
+
+Set custom PyPI index:
+
+```bash
+pixi config set pypi-config.index-url "https://my-pypi.example.com/simple"
+pixi config append pypi-config.extra-index-urls "https://backup-pypi.example.com/simple"
+```
+
+### Local workspace config
+
+Set workspace-specific configuration:
+
+```bash
+cd my-workspace
+pixi config set --local default-channels '["conda-forge"]'
+```
+
+### JSON output
+
+Get configuration as JSON:
+
+```bash
+pixi config list --json
+```
+
+### Unset configuration
+
+Remove a configuration value:
+
+```bash
+pixi config unset tls-no-verify
+```
+
+## Configuration Levels
+
+<Accordion title="Local (Workspace)">
+  **Location**: `.pixi/config.toml` in workspace root
+  
+  **Use for**: Workspace-specific settings
+  
+  ```bash
+  pixi config edit --local
+  pixi config set --local default-channels '["conda-forge"]'
+  ```
+</Accordion>
+
+<Accordion title="Global (User)">
+  **Location**: 
+  - Linux/macOS: `~/.config/pixi/config.toml`
+  - Windows: `%APPDATA%\pixi\config.toml`
+  
+  **Use for**: User preferences
+  
+  ```bash
+  pixi config edit --global
+  pixi config set --global tls-no-verify false
+  ```
+</Accordion>
+
+<Accordion title="System">
+  **Location**: System configuration directory
+  
+  **Use for**: System-wide settings
+  
+  ```bash
+  pixi config edit --system
+  pixi config set --system default-channels '["internal-channel"]'
+  ```
+</Accordion>
+
+## Configuration Precedence
+
+Configuration is loaded in this order (later overrides earlier):
+
+1. System configuration
+2. Global configuration  
+3. Local workspace configuration
+4. Environment variables
+5. CLI arguments
+
+## Related Commands
+
+- [`pixi auth`](/commands/auth) - Manage authentication
+- [`pixi info`](/commands/info) - View configuration locations
+
+## Related Configuration
+
+See the [Configuration Reference](/reference/configuration) for all available configuration options.

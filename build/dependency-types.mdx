@@ -1,0 +1,607 @@
+---
+title: Dependency Types
+description: Understanding build, host, and run dependencies in Pixi packages
+---
+
+Learn the three types of package dependencies and their specific roles in the build process.
+
+## Overview
+
+Package dependencies in Pixi are more granular than workspace dependencies. While workspace dependencies are simply packages available in environments, package dependencies distinguish between **when** and **where** they're needed:
+
+```toml
+[package.build-dependencies]
+cxx-compiler = "*"  # Build machine, compile time
+
+[package.host-dependencies]
+catch = "*"         # Target machine, link time
+
+[package.run-dependencies]
+git = "*"           # Target machine, runtime
+```
+
+<Note>
+Think of it this way:
+- **Build dependencies** run on your machine during compilation
+- **Host dependencies** are compiled into your package
+- **Run dependencies** are needed when using your package
+</Note>
+
+## Build Dependencies
+
+Build dependencies are tools needed to build the package, installed for the architecture of the **build machine**.
+
+### When to Use Build Dependencies
+
+Use for tools that:
+- Run during compilation but aren't compiled into the package
+- Generate code or resources
+- Are specific to your development machine
+
+### Common Examples
+
+<CodeGroup>
+
+```toml Compilers
+[package.build-dependencies]
+cxx-compiler = "*"
+c-compiler = "*"
+fortran-compiler = "*"
+```
+
+```toml Build Tools
+[package.build-dependencies]
+cmake = ">=3.20"
+meson = "*"
+ninja = "*"
+```
+
+```toml Code Generators
+[package.build-dependencies]
+swig = "*"
+protobuf = "*"
+```
+
+</CodeGroup>
+
+<Warning>
+**Important for pixi-build-cmake users:**
+
+The `pixi-build-cmake` backend automatically provides `cmake`, `ninja`, and C++ compilers. You don't need to specify them:
+
+```toml
+# This is automatic with pixi-build-cmake
+# [package.build-dependencies]
+# cmake = "*"  # Not needed!
+# ninja = "*"  # Not needed!
+# cxx-compiler = "*"  # Not needed!
+```
+</Warning>
+
+### Cross-Compilation Example
+
+Build dependencies enable cross-compilation:
+
+```toml
+[workspace]
+platforms = ["linux-aarch64"]  # Target: Linux ARM
+
+[package.build-dependencies]
+cmake = "*"  # Runs on your x86_64 MacBook
+
+[package.host-dependencies]
+sdl2 = "*"   # ARM64 libraries for the target
+```
+
+**Build vs Host Platform:**
+- **Build platform**: Your machine (e.g., `osx-arm64`)
+- **Host/target platform**: Where the code runs (e.g., `linux-aarch64`)
+
+<Accordion title="Understanding build machine terminology">
+The terminology comes from cross-compilation:
+
+| Machine | Definition | Example |
+|---------|------------|----------|
+| **Build** | Where compilation happens | Your MacBook (osx-arm64) |
+| **Host** | Where the code runs | Linux server (linux-64) |
+| **Target** | For compilers: what they generate code for | ARM device (linux-aarch64) |
+
+For most builds, build = host = target.
+</Accordion>
+
+## Host Dependencies
+
+Host dependencies are needed during build/link time and are specific to the **target platform**.
+
+### When to Use Host Dependencies
+
+Use for:
+- Libraries you link against
+- Headers you include
+- Base interpreters (Python, R, Node.js)
+- Build backends for interpreted languages
+
+### Common Examples
+
+<CodeGroup>
+
+```toml C++ Libraries
+[package.host-dependencies]
+sdl2 = ">=2.26.5,<3.0"
+boost = ">=1.70"
+openssl = "*"
+rapid
+= "*"
+xtensor = "*"
+```
+
+```toml Python Packages
+[package.host-dependencies]
+python = ">=3.11"
+numpy = ">=1.20"
+pybind11 = "*"
+nanobind = ">=2.4"
+```
+
+```toml Build Backends
+[package.host-dependencies]
+hatchling = "*"
+setuptools = "*"
+poetry-core = "*"
+```
+
+</CodeGroup>
+
+### Python Build Backends
+
+Python build tools must go in `host-dependencies` due to technical limitations:
+
+```toml
+[package.host-dependencies]
+hatchling = "*"  # PEP 517 backend
+uv = "*"          # Package installer
+pip = "*"         # Alternative installer
+```
+
+<Warning>
+**Technical Limitation:**
+
+Tools like `hatchling`, `pip`, and `uv` must be host dependencies (not build dependencies) to ensure they use the correct Python prefix during the build process. We're working to improve this.
+</Warning>
+
+### Native Code Libraries
+
+When building C++ or other native code:
+
+```toml
+[package.host-dependencies]
+sdl2 = "*"       # Will be linked into your binary
+zlib = "*"       # Will be linked into your binary
+libpng = "*"     # Will be linked into your binary
+```
+
+### Cross-Compilation Scenario
+
+Compiling on Linux x86_64 for Linux ARM:
+
+```text
+Build Machine: linux-64 (your PC)
+Target Machine: linux-aarch64
+```
+
+| Component | Type | Build | Host | Target |
+|-----------|------|-------|------|--------|
+| GCC | Compiler | x86_64 | x86_64 | aarch64 |
+| CMake | Build tool | x86_64 | x86_64 | N/A |
+| SDL2 | Library | N/A | aarch64 | N/A |
+| Your App | Application | x86_64 | aarch64 | N/A |
+
+```toml
+[package.build-dependencies]
+cmake = "*"  # x86_64 version
+
+[package.host-dependencies]
+sdl2 = "*"   # aarch64 version (target platform)
+```
+
+### Run-Exports
+
+Many conda packages define `run-exports`, which automatically add run dependencies:
+
+```toml
+[package.host-dependencies]
+zlib = "*"  # Automatically added to run-dependencies via run-exports!
+```
+
+<Note>
+Most conda-forge packages have `run-exports` defined. When you add them to `host-dependencies`, they're automatically added to `run-dependencies` - no need to specify twice!
+</Note>
+
+## Run Dependencies
+
+Run dependencies (also just called "dependencies") are required when **using** the package.
+
+### When to Use Run Dependencies
+
+Use for:
+- Libraries loaded at runtime
+- Executables called by your package
+- Resources needed during execution
+
+### Common Examples
+
+<CodeGroup>
+
+```toml Python Packages
+[package.run-dependencies]
+rich = ">=13.9"
+requests = "*"
+numpy = ">=1.20"
+```
+
+```toml System Tools
+[package.run-dependencies]
+git = "*"
+curl = "*"
+bash = "*"
+```
+
+```toml Dynamic Libraries
+[package.run-dependencies]
+libpq = "*"      # PostgreSQL client
+libsqlite = "*" # SQLite
+```
+
+</CodeGroup>
+
+### Run Dependencies in Workspaces
+
+Run dependencies are similar to workspace dependencies:
+
+```toml
+# Workspace dependency
+[dependencies]
+rich = "*"
+
+# Package run dependency
+[package.run-dependencies]
+rich = "*"
+```
+
+Both make the package available at runtime, but package run-dependencies are included when others depend on your package.
+
+### Path Dependencies
+
+Depend on other packages in your workspace:
+
+```toml
+[package.run-dependencies]
+cpp_math = { path = "packages/cpp_math" }
+core_utils = { path = "../core_utils" }
+```
+
+See the [workspace guide](./workspace) for multi-package examples.
+
+## Complete Example
+
+Here's a C++ package with all three dependency types:
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+my_package = { path = "." }
+
+[package]
+name = "my_package"
+version = "0.1.0"
+
+[package.build.backend]
+name = "pixi-build-cmake"
+version = "0.3.*"
+
+# Tools that run during build on your machine
+[package.build-dependencies]
+pkg-config = "*"     # Find library paths
+autoreconf = "*"     # Generate configure scripts
+
+# Libraries linked into the package
+[package.host-dependencies]
+sdl2 = ">=2.26.5,<3" # Graphics library
+openssl = "*"        # Crypto (has run-exports)
+boost = ">=1.70"     # C++ utilities
+
+# Runtime requirements
+[package.run-dependencies]
+ffmpeg = "*"         # Video processing
+git = "*"            # Version control access
+# openssl added automatically via run-exports
+```
+
+## Python Package Example
+
+```toml title="pixi.toml"
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+my_py_package = { path = "." }
+
+[package]
+name = "my_py_package"
+version = "0.1.0"
+
+[package.build.backend]
+name = "pixi-build-python"
+version = "0.4.*"
+
+# Build tools for Python
+[package.host-dependencies]
+python = ">=3.11"    # Base interpreter
+hatchling = "*"      # PEP 517 backend
+numpy = ">=1.20"     # Build-time headers
+
+# Runtime dependencies
+[package.run-dependencies]
+rich = ">=13.9"      # CLI formatting
+requests = "*"       # HTTP client
+numpy = ">=1.20"     # Also needed at runtime
+```
+
+<Note>
+`numpy` appears in both `host-dependencies` (for headers during compilation of extensions) and `run-dependencies` (for runtime imports). This is common for packages with both C and Python components.
+</Note>
+
+## Decision Guide
+
+Use this flowchart to determine dependency type:
+
+```text
+Does it run during the build?
+│
+├── Yes: Is it compiled into the package?
+│   │
+│   ├── Yes: HOST DEPENDENCY
+│   │    Examples: libraries, headers, Python
+│   │
+│   └── No: BUILD DEPENDENCY
+│        Examples: CMake, compilers, code generators
+│
+└── No: Is it needed at runtime?
+    │
+    └── Yes: RUN DEPENDENCY
+         Examples: libraries, executables, Python packages
+```
+
+## Quick Reference Table
+
+| Aspect | Build | Host | Run |
+|--------|-------|------|-----|
+| **When used** | Compile time | Link time | Runtime |
+| **Platform** | Build machine | Target machine | Target machine |
+| **Examples** | cmake, compilers | libraries, headers | executables, libraries |
+| **Installed where** | Build environment | Target package | User environment |
+| **Cross-compile** | Build platform | Host platform | Host platform |
+
+## Common Patterns
+
+<AccordionGroup>
+
+<Accordion title="C++ with Python Bindings">
+```toml
+[package.build-dependencies]
+# Usually none (pixi-build-cmake provides tools)
+
+[package.host-dependencies]
+python = ">=3.11"
+nanobind = "*"
+boost = "*"
+
+[package.run-dependencies]
+# Many added via run-exports automatically
+```
+</Accordion>
+
+<Accordion title="Pure Python Package">
+```toml
+[package.host-dependencies]
+python = ">=3.11"
+hatchling = "*"
+
+[package.run-dependencies]
+requests = "*"
+rich = "*"
+click = "*"
+```
+</Accordion>
+
+<Accordion title="Rust Package">
+```toml
+[package.build-dependencies]
+rust = ">=1.70"
+cargo = "*"
+
+[package.host-dependencies]
+openssl = "*"
+
+[package.run-dependencies]
+# Usually minimal - statically linked
+```
+</Accordion>
+
+<Accordion title="Multi-language Package">
+```toml
+[package.build-dependencies]
+pkg-config = "*"
+
+[package.host-dependencies]
+python = ">=3.11"
+nanobind = "*"
+sdl2 = "*"
+openssl = "*"
+
+[package.run-dependencies]
+ffmpeg = "*"
+# sdl2, openssl added via run-exports
+```
+</Accordion>
+
+</AccordionGroup>
+
+## Understanding Run-Exports
+
+Run-exports automatically propagate dependencies:
+
+```toml
+# You write:
+[package.host-dependencies]
+zlib = "*"
+openssl = "*"
+
+# Conda automatically adds to run-dependencies:
+# zlib = ">=1.2.13,<2.0"
+# openssl = ">=3.0.0,<4.0"
+```
+
+View a package's run-exports:
+
+```bash
+pixi info zlib
+```
+
+<Note>
+Run-exports prevent version mismatches between build and runtime. If you build against zlib 1.2.13, run-exports ensure users get a compatible version.
+</Note>
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Start with minimal dependencies">
+Add only what's strictly needed:
+
+```toml
+# Good - minimal
+[package.host-dependencies]
+python = ">=3.11"
+hatchling = "*"
+
+[package.run-dependencies]
+rich = "*"
+```
+</Accordion>
+
+<Accordion title="Let run-exports work">
+Don't duplicate host and run dependencies if run-exports exist:
+
+```toml
+# Good - let run-exports handle it
+[package.host-dependencies]
+zlib = "*"
+
+# Bad - redundant
+[package.host-dependencies]
+zlib = "*"
+[package.run-dependencies]
+zlib = "*"  # Unnecessary!
+```
+</Accordion>
+
+<Accordion title="Be specific about versions">
+Use version constraints appropriately:
+
+```toml
+[package.host-dependencies]
+python = ">=3.11,<3.14"  # Specific range
+nanobind = ">=2.4,<3"    # Major version
+
+[package.run-dependencies]
+rich = ">=13.9"           # Minimum version
+```
+</Accordion>
+
+<Accordion title="Document special dependencies">
+Comment why dependencies exist:
+
+```toml
+[package.host-dependencies]
+python = ">=3.11"  # Requires match-case syntax
+nanobind = ">=2.4" # Need type stub support
+
+[package.run-dependencies]
+ffmpeg = "*"       # Video format conversion
+```
+</Accordion>
+
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Build Backends" icon="gears" href="./backends">
+How backends use different dependency types
+</Card>
+
+<Card title="Build Variants" icon="code-branch" href="./variants">
+How variants affect dependencies
+</Card>
+
+<Card title="C++ Packages" icon="cpp" href="./cpp-package">
+Dependency types in C++ builds
+</Card>
+
+<Card title="Python Packages" icon="python" href="./python-package">
+Dependency types in Python builds
+</Card>
+
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Library not found during build">
+Ensure it's in host-dependencies:
+
+```toml
+[package.host-dependencies]
+library-name = "*"
+```
+</Accordion>
+
+<Accordion title="Executable not found during build">
+Add to build-dependencies:
+
+```toml
+[package.build-dependencies]
+tool-name = "*"
+```
+</Accordion>
+
+<Accordion title="Runtime import errors">
+Add to run-dependencies:
+
+```toml
+[package.run-dependencies]
+missing-package = "*"
+```
+</Accordion>
+
+<Accordion title="Wrong architecture used">
+Verify dependency type:
+- Build deps use build platform
+- Host deps use target platform
+
+```toml
+# For cross-compilation
+[package.build-dependencies]
+cmake = "*"  # Your machine's arch
+
+[package.host-dependencies]
+sdl2 = "*"   # Target machine's arch
+```
+</Accordion>

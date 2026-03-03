@@ -1,0 +1,361 @@
+---
+title: Multi-Platform Configuration
+description: Configure Pixi workspaces for multiple operating systems and architectures
+---
+
+Pixi is designed to work across all major platforms. When building applications that run on multiple operating systems or architectures, you need platform-specific configuration. This guide shows you how.
+
+## Platform Definition
+
+Define supported platforms in your workspace:
+
+```toml
+[workspace]
+name = "my-app"
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+```
+
+### Supported Platforms
+
+- `linux-64` - Linux x86_64
+- `linux-aarch64` - Linux ARM64
+- `osx-64` - macOS Intel
+- `osx-arm64` - macOS Apple Silicon
+- `win-64` - Windows x86_64
+
+<Info>
+Pixi determines which dependencies to install for each platform individually, storing everything in the lock file.
+</Info>
+
+### Platform Validation
+
+Running `pixi install` on an unsupported platform shows a warning:
+
+```bash
+pixi install
+# WARN Not installing dependency for (default) on current platform: (osx-arm64)
+# as it is not part of this project's supported platforms.
+```
+
+## Target Specifiers
+
+Use target specifiers to configure platform-specific settings. The `[target.<platform>]` section overrides default configuration for specific platforms.
+
+<Warning>
+You can only target platforms listed in `workspace.platforms`. Targeting unlisted platforms causes an error.
+</Warning>
+
+### Platform-Specific Dependencies
+
+Install different packages or versions per platform:
+
+```toml
+[workspace]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+
+[dependencies]
+python = ">=3.8"
+
+# Windows-only dependencies
+[target.win-64.dependencies]
+msmpi = "*"
+python = "3.8"  # Overrides the >=3.8 requirement
+
+# macOS ARM-only dependencies
+[target.osx-arm64.dependencies]
+mlx = ">=0.16.0"
+
+# Linux-only dependencies
+[target.linux-64.dependencies]
+cuda = "12.1"
+```
+
+<Tip>
+Platform-specific dependencies **override** (not merge with) the base dependencies for that package.
+</Tip>
+
+### Using the CLI
+
+Add platform-specific dependencies from the command line:
+
+```bash
+# Add Windows-specific package
+pixi add --platform win-64 msmpi
+
+# Add macOS ARM-specific package
+pixi add --platform osx-arm64 mlx
+
+# Add Linux-specific build dependency
+pixi add --build --platform linux-64 cuda
+```
+
+This generates:
+
+```toml
+[target.win-64.dependencies]
+msmpi = "1.0.0.*"
+
+[target.osx-arm64.dependencies]
+mlx = "0.16.0.*"
+
+[target.linux-64.build-dependencies]
+cuda = "12.1.*"
+```
+
+### Host and Build Dependencies
+
+Platform-specific dependencies work with host and build dependencies too:
+
+```bash
+# Platform-specific host dependency
+pixi add --host --platform win-64 posix
+
+# Platform-specific build dependency
+pixi add --build --platform osx-64 clang
+```
+
+Results in:
+
+```toml
+[target.win-64.host-dependencies]
+posix = "1.0.0.*"
+
+[target.osx-64.build-dependencies]
+clang = "16.0.6.*"
+```
+
+## Platform-Specific Activation
+
+Different platforms often require different activation scripts:
+
+```toml
+[activation]
+scripts = ["setup.sh", "local_setup.bash"]
+
+[target.win-64.activation]
+scripts = ["setup.bat", "local_setup.bat"]
+```
+
+<Info>
+On Windows, only the `target.win-64.activation.scripts` run - the base `activation.scripts` are **replaced**, not merged.
+</Info>
+
+### Activation Environment Variables
+
+Set platform-specific environment variables:
+
+```toml
+[activation.env]
+DEFAULT_PATH = "/usr/local"
+
+[target.win-64.activation.env]
+DEFAULT_PATH = "C:\\Program Files"
+
+[target.osx-arm64.activation.env]
+DEFAULT_PATH = "/opt/homebrew"
+```
+
+## Platform-Specific System Requirements
+
+Define different system requirements per platform:
+
+```toml
+[system-requirements]
+linux = "4.18"
+
+[target.linux-64.system-requirements]
+cuda = "12.1"
+
+[target.osx-arm64.system-requirements]
+macos = "13.5"
+```
+
+## Complete Example
+
+Here's a real-world multi-platform configuration:
+
+```toml
+[workspace]
+name = "cross-platform-app"
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+
+# Base dependencies for all platforms
+[dependencies]
+python = ">=3.8"
+numpy = ">=1.21"
+
+# Windows-specific configuration
+[target.win-64.dependencies]
+python = "3.8"  # Windows needs specific version
+msmpi = "*"     # Windows MPI implementation
+
+[target.win-64.activation]
+scripts = ["setup.bat"]
+
+[target.win-64.activation.env]
+COMPILER = "msvc"
+
+# Linux-specific configuration
+[target.linux-64.dependencies]
+openmpi = "*"  # Linux MPI implementation
+
+[target.linux-64.system-requirements]
+linux = "4.18"
+libc = { family = "glibc", version = "2.28" }
+
+[target.linux-64.activation]
+scripts = ["setup.sh"]
+
+[target.linux-64.activation.env]
+COMPILER = "gcc"
+
+# macOS Intel configuration
+[target.osx-64.dependencies]
+clang = ">=14"
+
+[target.osx-64.activation]
+scripts = ["setup.sh"]
+
+# macOS ARM configuration
+[target.osx-arm64.dependencies]
+mlx = ">=0.16.0"  # Apple Silicon ML framework
+
+[target.osx-arm64.system-requirements]
+macos = "13.0"  # Minimum macOS version
+
+[target.osx-arm64.activation]
+scripts = ["setup.sh"]
+
+[target.osx-arm64.activation.env]
+COMPILER = "clang"
+ARCH = "arm64"
+
+# Shared activation for Unix-like systems
+[activation]
+scripts = ["setup.sh"]
+
+[activation.env]
+PROJECT_ROOT = "$PIXI_PROJECT_ROOT"
+```
+
+## Multi-Platform with Multiple Environments
+
+Combine platform targeting with multiple environments:
+
+```toml
+[workspace]
+name = "ml-project"
+channels = ["conda-forge", "pytorch", "nvidia"]
+platforms = ["linux-64", "osx-arm64"]
+
+[dependencies]
+python = "3.11.*"
+pytorch = { version = ">=2.0.1", channel = "pytorch" }
+
+# CUDA feature for Linux
+[feature.cuda]
+platforms = ["linux-64"]  # CUDA only on Linux
+system-requirements = { cuda = "12.1" }
+
+[feature.cuda.dependencies]
+pytorch-cuda = { version = "12.1.*", channel = "pytorch" }
+
+# MLX feature for macOS ARM
+[feature.mlx]
+platforms = ["osx-arm64"]  # MLX only on Apple Silicon
+
+[feature.mlx.dependencies]
+mlx = ">=0.16.0"
+
+[environments]
+cuda = ["cuda"]  # Only resolves on linux-64
+mlx = ["mlx"]    # Only resolves on osx-arm64
+```
+
+Usage:
+
+```bash
+# On Linux with CUDA
+pixi run --environment cuda train-model
+
+# On macOS ARM with MLX
+pixi run --environment mlx train-model
+
+# Error on wrong platform
+# pixi run --environment cuda train-model
+# Error: cuda environment not available on osx-arm64
+```
+
+## Best Practices
+
+**Define All Target Platforms**
+```toml
+[workspace]
+# Be explicit about supported platforms
+platforms = ["linux-64", "osx-arm64", "win-64"]
+```
+
+**Use Platform-Specific Activation**
+```toml
+# Base script for Unix-like systems
+[activation]
+scripts = ["setup.sh"]
+
+# Override for Windows
+[target.win-64.activation]
+scripts = ["setup.bat"]
+```
+
+**Test on All Platforms**
+```yaml
+# .github/workflows/test.yml
+strategy:
+  matrix:
+    os: [ubuntu-latest, macos-latest, windows-latest]
+steps:
+  - run: pixi install --frozen
+  - run: pixi run test
+```
+
+**Document Platform Requirements**
+```toml
+# README.md should mention:
+# - Supported platforms
+# - Platform-specific system requirements
+# - Platform-specific features
+```
+
+<Accordion title="Common Platform Patterns">
+
+**Cross-Platform Python**
+```toml
+[dependencies]
+python = ">=3.8"
+numpy = "*"
+```
+
+**Platform-Specific Compilers**
+```toml
+[target.linux-64.dependencies]
+gcc = "*"
+
+[target.osx-64.dependencies]
+clang = "*"
+
+[target.win-64.dependencies]
+vs2019_win-64 = "*"
+```
+
+**Hardware Acceleration**
+```toml
+[target.linux-64.dependencies]
+cuda = "12.1"
+cudnn = "8.*"
+
+[target.osx-arm64.dependencies]
+mlx = "*"  # Apple Silicon ML
+```
+
+</Accordion>

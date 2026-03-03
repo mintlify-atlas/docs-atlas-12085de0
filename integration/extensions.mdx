@@ -1,0 +1,428 @@
+---
+title: 'Pixi Extensions'
+description: 'Extend Pixi functionality with custom commands and extensions'
+---
+
+Pixi supports extensions that add new subcommands to the `pixi` CLI. Extensions are standalone executables that integrate seamlessly with Pixi's command structure.
+
+## How Extensions Work
+
+When you run `pixi <command>`, Pixi searches for an executable named `pixi-<command>` and executes it with any additional arguments.
+
+### Naming Convention
+
+Extensions follow the pattern: `pixi-{command}`
+
+<CodeGroup>
+```bash Examples
+pixi diff      # → Executes pixi-diff
+pixi pack      # → Executes pixi-pack
+pixi deploy    # → Executes pixi-deploy
+pixi skills    # → Executes pixi-skills
+```
+</CodeGroup>
+
+### Discovery Mechanism
+
+Pixi discovers extensions by searching for `pixi-*` executables in:
+
+1. **PATH Environment Variable** - All directories in your `PATH`
+2. **`pixi global` Directories** - Managed by `pixi global install`
+
+All discovered extensions appear in `pixi --list` alongside built-in commands.
+
+## Installing Extensions
+
+### Using pixi global (Recommended)
+
+Install extensions using `pixi global install`:
+
+<CodeGroup>
+```bash Single Extension
+pixi global install pixi-pack
+```
+
+```bash Multiple Extensions
+pixi global install pixi-pack pixi-diff pixi-skills
+```
+</CodeGroup>
+
+**Benefits:**
+- Isolated environments prevent dependency conflicts
+- Automatic discovery without modifying PATH
+- Easy management with `pixi global list` and `pixi global remove`
+- Consistent experience with built-in commands
+
+### Manual Installation
+
+Install by placing the executable in any directory in your PATH:
+
+```bash
+curl -L https://github.com/user/pixi-myext/releases/download/v1.0.0/pixi-myext -o pixi-myext
+chmod +x pixi-myext
+mv pixi-myext ~/.local/bin/
+```
+
+## Popular Extensions
+
+### pixi-pack
+
+Package Pixi environments as portable archives.
+
+```bash
+pixi global install pixi-pack pixi-unpack
+pixi pack --environment prod --platform linux-64
+```
+
+See the [pixi-pack documentation](/deployment/pixi-pack) for details.
+
+### pixi-diff
+
+Compare lockfiles to see what changed between environments.
+
+```bash
+pixi global install pixi-diff pixi-diff-to-markdown glow-md
+pixi diff --before pixi.lock.old --after pixi.lock.new
+```
+
+**Features:**
+- JSON output for programmatic use
+- Integration with git history
+- Human-readable markdown reports
+- Terminal rendering with glow
+
+**Example workflow:**
+
+```bash
+# Compare with 20 commits ago
+pixi diff --before <(git show HEAD~20:pixi.lock) --after pixi.lock
+
+# Generate markdown report
+pixi diff <(git show HEAD~20:pixi.lock) pixi.lock | pixi diff-to-markdown > diff.md
+
+# View in terminal
+pixi diff <(git show HEAD~20:pixi.lock) pixi.lock | pixi diff-to-markdown | glow --tui
+```
+
+<Note>
+See [pixi-diff documentation](https://github.com/pavelzw/pixi-diff) for full usage details.
+</Note>
+
+### pixi-inject
+
+Inject conda packages into existing Pixi environments.
+
+```bash
+pixi global install pixi-inject
+pixi inject --environment default --package my-package-0.1.0-py313h8aa417a_0.conda
+```
+
+**Use cases:**
+- Testing locally built packages
+- Patching environments without rebuilding
+- Development workflows
+
+**Custom prefix:**
+
+```bash
+pixi inject --prefix /path/to/conda/env --package my-package.conda
+```
+
+### pixi-skills
+
+Manage and install coding agent skills across LLM backends.
+
+```bash
+pixi global install pixi-skills
+pixi skills manage
+```
+
+**Features:**
+- Interactive skill management UI
+- Discover skills from pixi environments
+- Install into Claude, Aider, and other AI coding assistants
+- Support for local and global skill scopes
+
+**Example usage:**
+
+<Steps>
+  <Step title="Install pixi-skills">
+    ```bash
+    pixi global install pixi-skills
+    ```
+  </Step>
+  
+  <Step title="Add skill packages">
+    ```toml pixi.toml
+    [workspace]
+    channels = ["conda-forge", "https://prefix.dev/skill-forge"]
+    
+    [feature.dev.dependencies]
+    agent-skill-polars = "*"
+    ```
+  </Step>
+  
+  <Step title="Manage skills">
+    ```bash
+    pixi skills manage --backend claude --scope local
+    ```
+  </Step>
+</Steps>
+
+Learn more in the [pixi-skills blog post](https://pavel.pink/blog/pixi-skills).
+
+## Creating Extensions
+
+Build your own Pixi extensions to add custom functionality.
+
+### Basic Extension Example
+
+```python pixi-hello
+#!/usr/bin/env python3
+import sys
+
+def main():
+    name = sys.argv[1] if len(sys.argv) > 1 else "World"
+    print(f"Hello, {name}!")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+<Steps>
+  <Step title="Make executable">
+    ```bash
+    chmod +x pixi-hello
+    ```
+  </Step>
+  
+  <Step title="Place in PATH">
+    ```bash
+    mv pixi-hello ~/.local/bin/
+    ```
+  </Step>
+  
+  <Step title="Use the extension">
+    ```bash
+    pixi hello Alice
+    # Output: Hello, Alice!
+    ```
+  </Step>
+</Steps>
+
+### Extension in Rust
+
+```rust src/main.rs
+use clap::Parser;
+
+#[derive(Parser)]
+#[command(name = "pixi-greet")]
+#[command(about = "A greeting extension for Pixi")]
+struct Cli {
+    /// Name to greet
+    name: Option<String>,
+    
+    /// Use formal greeting
+    #[arg(short, long)]
+    formal: bool,
+}
+
+fn main() {
+    let cli = Cli::parse();
+    let name = cli.name.as_deref().unwrap_or("World");
+    
+    if cli.formal {
+        println!("Good day, {}!", name);
+    } else {
+        println!("Hey {}!", name);
+    }
+}
+```
+
+```toml Cargo.toml
+[package]
+name = "pixi-greet"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+
+[[bin]]
+name = "pixi-greet"
+path = "src/main.rs"
+```
+
+Build and install:
+
+```bash
+cargo build --release
+cp target/release/pixi-greet ~/.local/bin/
+pixi greet --formal Alice
+# Output: Good day, Alice!
+```
+
+## Best Practices
+
+<Card title="Descriptive Names" icon="tag">
+Use clear, descriptive names: `pixi-diff` is better than `pixi-d`.
+</Card>
+
+<Card title="Standard Arguments" icon="terminal">
+Support `--help` and follow UNIX conventions for flags and exit codes.
+</Card>
+
+<Card title="Exit Codes" icon="circle-check">
+Use exit code 0 for success, non-zero for errors.
+</Card>
+
+<Card title="Pixi Integration" icon="link">
+Respect Pixi's environment management and work with its conventions.
+</Card>
+
+<Card title="Documentation" icon="book">
+Provide clear usage documentation and examples.
+</Card>
+
+## Command Suggestions
+
+Pixi suggests similar commands when you mistype:
+
+```bash
+$ pixi pck
+error: unrecognized subcommand 'pck'
+tip: a similar subcommand exists: 'pack'
+```
+
+This works for both built-in commands and extensions.
+
+## Listing Extensions
+
+View all available commands including extensions:
+
+```bash
+pixi --list
+```
+
+Output includes:
+- Built-in Pixi commands
+- Installed extensions
+- Brief descriptions
+
+## Extension Development Tips
+
+### Argument Handling
+
+Extensions receive all arguments after the command name:
+
+```bash
+pixi myext --flag value arg1 arg2
+# pixi-myext receives: ["--flag", "value", "arg1", "arg2"]
+```
+
+### Environment Variables
+
+Access Pixi's environment:
+
+```python
+import os
+
+pixi_project_root = os.environ.get("PIXI_PROJECT_ROOT")
+pixi_environment = os.environ.get("PIXI_ENVIRONMENT_NAME")
+```
+
+### Error Handling
+
+```rust
+use std::process::exit;
+
+fn main() {
+    match run() {
+        Ok(_) => exit(0),
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            exit(1);
+        }
+    }
+}
+
+fn run() -> Result<(), Box<dyn std::error::Error>> {
+    // Extension logic
+    Ok(())
+}
+```
+
+### Testing
+
+Test extensions as standalone programs:
+
+```bash
+# Direct execution
+./pixi-myext --help
+
+# Via pixi
+pixi myext --help
+```
+
+## Publishing Extensions
+
+### As Conda Packages
+
+Publish to conda-forge or custom channels:
+
+```yaml meta.yaml
+package:
+  name: pixi-myext
+  version: 1.0.0
+
+build:
+  number: 0
+  script: cargo install --root $PREFIX --path .
+
+requirements:
+  build:
+    - rust
+
+test:
+  commands:
+    - pixi-myext --help
+
+about:
+  home: https://github.com/user/pixi-myext
+  license: MIT
+  summary: My awesome Pixi extension
+```
+
+Users can install via:
+
+```bash
+pixi global install pixi-myext
+```
+
+### As Binaries
+
+Publish releases on GitHub:
+
+1. Build for multiple platforms
+2. Create GitHub release
+3. Upload binaries
+4. Document installation in README
+
+## Community
+
+<Card title="Discord" icon="discord" href="https://discord.gg/kKV8ZxyzY4">
+Join the Pixi Discord for discussions and support.
+</Card>
+
+<Card title="GitHub" icon="github" href="https://github.com/prefix-dev/pixi">
+Contribute to Pixi or browse existing extensions.
+</Card>
+
+## See Also
+
+- [pixi-diff](https://github.com/pavelzw/pixi-diff) - Compare lock files
+- [pixi-inject](https://github.com/pavelzw/pixi-inject) - Inject packages
+- [pixi-skills](https://github.com/pavelzw/pixi-skills) - Manage AI agent skills
+- [pixi-pack](/deployment/pixi-pack) - Package environments
+- [Global Tools](/tutorials/global-tools) - Managing global installations

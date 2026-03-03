@@ -1,0 +1,392 @@
+---
+title: Environment Activation
+description: How pixi activates environments and sets environment variables
+---
+
+Pixi activates environments differently than conda, providing a more streamlined experience that doesn't require modifying shell configuration files.
+
+## How Pixi Shell Works
+
+The `pixi shell` command launches a fresh shell with the environment activated, instead of modifying your current shell like `conda activate`.
+
+```bash
+pixi shell
+```
+
+To exit, simply close the shell:
+
+```bash
+exit  # or press Ctrl+D
+```
+
+### Activation Mechanism (Unix)
+
+On Unix systems, pixi creates a "fake" PTY session:
+
+1. Launches a new shell process
+2. Sends an activation command to stdin: `source /tmp/activation-env-12345.sh`
+3. Waits for `PIXI_ENV_ACTIVATED` echo to confirm success
+4. If no confirmation after 3 seconds, issues a warning
+
+```bash
+# What pixi does internally
+source /tmp/activation-env-12345.sh
+echo "PIXI_ENV_ACTIVATED"
+```
+
+## Automatic Shell Completions
+
+Shell completions for tools in your environment are loaded automatically:
+
+```bash
+pixi shell
+# Completions for git, cargo, npm, etc. are now available
+```
+
+To disable:
+
+```toml
+[shell]
+source-completion-scripts = false
+```
+
+## Environment Variables Set by Pixi
+
+Pixi sets these variables when running `pixi run`, `pixi shell`, or `pixi shell-hook`:
+
+<ParamField path="PIXI_PROJECT_ROOT" type="string">
+  The root directory of the project
+</ParamField>
+
+<ParamField path="PIXI_PROJECT_NAME" type="string">
+  The name of the project from the manifest
+</ParamField>
+
+<ParamField path="PIXI_PROJECT_MANIFEST" type="string">
+  Path to the manifest file (`pixi.toml` or `pyproject.toml`)
+</ParamField>
+
+<ParamField path="PIXI_PROJECT_VERSION" type="string">
+  The version of the project
+</ParamField>
+
+<ParamField path="PIXI_PROMPT" type="string">
+  The prompt to use in the shell
+</ParamField>
+
+<ParamField path="PIXI_ENVIRONMENT_NAME" type="string" default="default">
+  Name of the active environment
+</ParamField>
+
+<ParamField path="PIXI_ENVIRONMENT_PLATFORMS" type="string">
+  Comma-separated list of platforms supported by the project
+</ParamField>
+
+<ParamField path="CONDA_PREFIX" type="string">
+  Path to the environment (conda compatibility)
+</ParamField>
+
+<ParamField path="CONDA_DEFAULT_ENV" type="string">
+  Name of the environment (conda compatibility)
+</ParamField>
+
+<ParamField path="PATH" type="string">
+  Prepended with environment's bin directory
+</ParamField>
+
+<ParamField path="INIT_CWD" type="string">
+  **ONLY in `pixi run`**: Directory where command was run from
+</ParamField>
+
+<Note>
+  These variables cannot be overridden by users. For example, setting `PIXI_PROJECT_ROOT` in your environment won't change where pixi looks for the project.
+</Note>
+
+## Environment Variable Priority
+
+Variables are set with the following priority (highest to lowest):
+
+```
+task.env > activation.env > activation.scripts > dependency scripts > outside variables
+```
+
+### Example 1: task.env > activation.env
+
+```toml
+[tasks.hello]
+cmd = "echo $HELLO_WORLD"
+env = { HELLO_WORLD = "Hello world!" }
+
+[activation.env]
+HELLO_WORLD = "Activate!"
+```
+
+```bash
+pixi run hello
+# Output: Hello world!
+```
+
+The task environment variable wins.
+
+### Example 2: activation.env > activation.scripts
+
+```toml
+[activation.env]
+DEBUG_MODE = "enabled"
+
+[activation]
+scripts = ["setup.sh"]
+```
+
+```bash title="setup.sh"
+export DEBUG_MODE="disabled"
+```
+
+```bash
+pixi run echo $DEBUG_MODE
+# Output: enabled
+```
+
+The manifest `activation.env` wins over activation scripts.
+
+### Example 3: activation.scripts > dependency scripts
+
+```toml
+[activation]
+scripts = ["local_setup.sh"]
+
+[dependencies]
+my-package = "*"  # Has activation scripts setting LIB_PATH="/dep/lib"
+```
+
+```bash title="local_setup.sh"
+export LIB_PATH="/my/lib"
+```
+
+```bash
+pixi run echo $LIB_PATH
+# Output: /my/lib
+```
+
+Local activation scripts override dependency scripts.
+
+### Example 4: dependency scripts > outside variables
+
+```bash
+# Outside environment
+export PYTHON_PATH="/system/python"
+```
+
+```toml
+[dependencies]
+python-utils = "*"  # Sets PYTHON_PATH="/pixi/python"
+```
+
+```bash
+pixi run echo $PYTHON_PATH
+# Output: /pixi/python
+```
+
+Dependency activation scripts override outside environment.
+
+### Example 5: Complete Priority Chain
+
+```toml
+[tasks.start]
+cmd = "echo Config: $APP_CONFIG"
+env = { APP_CONFIG = "task-specific" }
+
+[activation.env]
+APP_CONFIG = "activation-env"
+
+[activation]
+scripts = ["app_setup.sh"]
+
+[dependencies]
+config-loader = "*"  # Sets APP_CONFIG="dependency-config"
+```
+
+```bash title="app_setup.sh"
+export APP_CONFIG="activation-script"
+```
+
+```bash
+# Outside environment
+export APP_CONFIG="system-config"
+```
+
+```bash
+pixi run start
+# Output: Config: task-specific
+```
+
+The task environment variable has the highest priority.
+
+<Warning>
+  In older versions of pixi, this priority was not well-defined. If you're upgrading from an old version, review your environment variable usage.
+</Warning>
+
+## Activation Cache (Experimental)
+
+Cache environment activation to speed up repeated `pixi run` and `pixi shell` invocations.
+
+### Enable Activation Cache
+
+```bash
+# Enable globally
+pixi config set experimental.use-environment-activation-cache true --global
+
+# Enable for workspace
+pixi config set experimental.use-environment-activation-cache true --local
+```
+
+### Cache Structure
+
+Cache files are stored in `.pixi/activation-env-v0/`:
+
+```bash
+tree .pixi/activation-env-v0/
+```
+
+```
+.pixi/activation-env-v0/
+├── activation_default.json
+└── activation_lint.json
+```
+
+### Cache Contents
+
+```json
+{
+  "hash": "8d8344e0751d377a",
+  "environment_variables": {
+    "PATH": "/path/to/env/bin:/usr/bin",
+    "CONDA_PREFIX": "/path/to/env",
+    "PIXI_PROJECT_ROOT": "/path/to/project"
+  }
+}
+```
+
+The hash includes:
+- Lock file data for the environment
+- `activation.scripts` from manifest
+- `activation.env` from manifest
+
+### Force Reactivation
+
+Ignore the cache and force full activation:
+
+```bash
+pixi run --force-activate
+pixi shell --force-activate
+pixi shell-hook --force-activate
+```
+
+Or configure globally:
+
+```toml
+[shell]
+force-activate = true
+```
+
+<Note>
+  This is experimental because cache invalidation is complex. Use with caution in production environments.
+</Note>
+
+## Common Issues with Pixi Shell
+
+Some shell configurations can interfere with pixi's activation mechanism.
+
+### WSL Issue
+
+```bash title="~/.bashrc"
+# This can prevent pixi shell from working
+wsl.exe -d wsl-vpnkit --cd /app service wsl-vpnkit start
+```
+
+The `wsl.exe` command takes over stdin and prevents activation.
+
+### Alternative Shell in bashrc
+
+```bash title="~/.bashrc"
+# This breaks pixi shell
+if [[ $- = *i* ]]; then
+  exec ~/.pixi/bin/fish
+fi
+```
+
+<Note>
+  If you want to start an alternative shell, do so from `~/.bash_profile` or `~/.profile` instead of `~/.bashrc`.
+</Note>
+
+## Alternative: Shell Hook
+
+If `pixi shell` doesn't work due to the issues above, use `pixi shell-hook`:
+
+### Bash/Zsh
+
+```bash title="~/.bashrc or ~/.zshrc"
+eval "$(pixi shell-hook)"
+```
+
+### Fish
+
+```fish title="~/.config/fish/config.fish"
+pixi shell-hook | source
+```
+
+### PowerShell
+
+```powershell title="$PROFILE"
+Invoke-Expression (&pixi shell-hook)
+```
+
+This provides conda-style activation without the PTY mechanism.
+
+## Customizing the Prompt
+
+By default, pixi adds `(pixi)` to your shell prompt.
+
+### Disable Prompt Modification
+
+```toml
+[shell]
+change-ps1 = false
+```
+
+Or via CLI:
+
+```bash
+pixi shell --change-ps1=false
+```
+
+### Custom Prompt
+
+The `PIXI_PROMPT` variable contains the prompt prefix:
+
+```bash
+echo $PIXI_PROMPT
+# Output: (pixi:default)
+```
+
+Use in your custom prompt:
+
+```bash title="~/.bashrc"
+if [ -n "$PIXI_PROMPT" ]; then
+  PS1="${PIXI_PROMPT} ${PS1}"
+fi
+```
+
+## Best Practices
+
+1. **Use `pixi run` for tasks** instead of manually activating environments
+2. **Use `pixi shell` for interactive work** when you need environment access
+3. **Avoid modifying PIXI_* variables** as they're managed by pixi
+4. **Document activation scripts** to help team members understand environment setup
+5. **Test activation** after adding new activation scripts
+6. **Use shell-hook** if pixi shell doesn't work with your shell configuration
+7. **Enable activation cache** for large projects to improve performance
+
+<Warning>
+  Don't mix `conda activate` and `pixi shell` in the same shell session. They use different activation mechanisms and can conflict.
+</Warning>

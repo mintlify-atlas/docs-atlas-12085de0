@@ -1,0 +1,456 @@
+---
+title: pixi remove
+description: Remove dependencies from your pixi workspace
+---
+
+The `pixi remove` command removes dependencies from your workspace manifest and updates the lock file.
+
+## Usage
+
+```bash
+pixi remove [OPTIONS] <SPEC>...
+```
+
+## Arguments
+
+<ParamField path="SPEC" type="string" required>
+  The dependency to remove. Can be:
+  - Package name: `numpy`
+  - Multiple packages: `numpy pandas scipy`
+  
+  Multiple packages can be specified.
+</ParamField>
+
+## Options
+
+### Dependency Type
+
+<ParamField path="--pypi" type="boolean" default="false">
+  Remove a PyPI dependency instead of conda. Conflicts with `--host` and `--build`.
+</ParamField>
+
+```bash
+pixi remove --pypi requests
+pixi remove --pypi flask boto3
+```
+
+<ParamField path="--host" type="boolean" default="false">
+  Remove a host dependency. Conflicts with `--build` and `--pypi`.
+</ParamField>
+
+<ParamField path="--build" type="boolean" default="false">
+  Remove a build dependency. Conflicts with `--host` and `--pypi`.
+</ParamField>
+
+```bash
+pixi remove cmake --build
+pixi remove python --host
+```
+
+### Platform-Specific
+
+<ParamField path="--platform" type="string">
+  Remove dependency for specific platform(s). Can be specified multiple times.
+  
+  Short flag: `-p`
+</ParamField>
+
+```bash
+pixi remove cuda --platform linux-64
+pixi remove numpy --platform linux-64 --platform osx-arm64
+```
+
+### Feature-Specific
+
+<ParamField path="--feature" type="string" default="default">
+  Remove dependency from a specific feature.
+  
+  Short flag: `-f`
+</ParamField>
+
+```bash
+pixi remove pytest --feature test
+pixi remove cuda --feature gpu
+```
+
+## Update Options
+
+### Skip Installation
+
+<ParamField path="--no-install" type="boolean" default="false">
+  Don't reinstall the environment, only update the lock file.
+</ParamField>
+
+```bash
+pixi remove numpy --no-install
+```
+
+### Lock File Usage
+
+<ParamField path="--frozen" type="boolean" default="false">
+  Don't update the lock file.
+  
+  Env: `PIXI_FROZEN`
+</ParamField>
+
+<ParamField path="--locked" type="boolean" default="false">
+  Require lock file to be up-to-date.
+  
+  Env: `PIXI_LOCKED`
+</ParamField>
+
+```bash
+pixi remove numpy --frozen
+pixi remove pandas --locked
+```
+
+## Examples
+
+### Remove Single Package
+
+```bash
+pixi remove numpy
+```
+
+Before:
+```toml
+[dependencies]
+python = "3.11.*"
+numpy = ">=1.26.0,<2"
+pandas = ">=2.0.0,<3"
+```
+
+After:
+```toml
+[dependencies]
+python = "3.11.*"
+pandas = ">=2.0.0,<3"
+```
+
+### Remove Multiple Packages
+
+```bash
+pixi remove numpy pandas scipy
+```
+
+### Remove PyPI Package
+
+```bash
+pixi remove --pypi requests
+```
+
+Before:
+```toml
+[pypi-dependencies]
+requests = "*"
+flask = ">=2.0.0"
+```
+
+After:
+```toml
+[pypi-dependencies]
+flask = ">=2.0.0"
+```
+
+### Remove from PyProject.toml
+
+For `pyproject.toml` manifests, `pixi remove --pypi` removes from:
+
+**Default feature**: `project.dependencies`
+
+```bash
+pixi remove --pypi boto3
+```
+
+Before:
+```toml
+[project]
+dependencies = [
+  "boto3",
+  "requests",
+]
+```
+
+After:
+```toml
+[project]
+dependencies = [
+  "requests",
+]
+```
+
+**Named feature**: `dependency-groups` or `tool.pixi.pypi-dependencies`
+
+```bash
+pixi remove --pypi boto3 --feature aws
+```
+
+Before:
+```toml
+[dependency-groups]
+aws = [
+  "boto3",
+  "s3fs",
+]
+```
+
+After:
+```toml
+[dependency-groups]
+aws = [
+  "s3fs",
+]
+```
+
+### Remove Platform-Specific Package
+
+```bash
+pixi remove cuda --platform linux-64
+```
+
+Before:
+```toml
+[target.linux-64.dependencies]
+cuda = ">=12.0.0,<13"
+numpy = ">=1.26.0,<2"
+
+[dependencies]
+python = "3.11.*"
+```
+
+After:
+```toml
+[target.linux-64.dependencies]
+numpy = ">=1.26.0,<2"
+
+[dependencies]
+python = "3.11.*"
+```
+
+### Remove from Feature
+
+```bash
+pixi remove pytest pytest-cov --feature test
+```
+
+Before:
+```toml
+[feature.test.dependencies]
+pytest = ">=8.0.0,<9"
+pytest-cov = ">=4.0.0,<5"
+pytest-mock = "*"
+```
+
+After:
+```toml
+[feature.test.dependencies]
+pytest-mock = "*"
+```
+
+### Remove Build Dependency
+
+```bash
+pixi remove cmake --build
+```
+
+Before:
+```toml
+[build-dependencies]
+cmake = ">=3.20"
+make = "*"
+```
+
+After:
+```toml
+[build-dependencies]
+make = "*"
+```
+
+## Combining Options
+
+### Platform + Feature
+
+```bash
+pixi remove cuda --platform linux-64 --feature gpu
+```
+
+Removes `cuda` from the `gpu` feature on `linux-64` platform only.
+
+### Multiple Platforms
+
+```bash
+pixi remove numpy --platform linux-64 --platform osx-arm64
+```
+
+Removes `numpy` from both specified platforms.
+
+### PyPI + Feature
+
+```bash
+pixi remove --pypi pytest --feature test
+```
+
+Removes PyPI `pytest` from the `test` feature.
+
+## Global Options
+
+<ParamField path="--manifest-path" type="string">
+  Path to `pixi.toml`, `pyproject.toml`, or workspace directory.
+  
+  Short flag: `-m`
+</ParamField>
+
+```bash
+pixi remove numpy --manifest-path /path/to/project
+```
+
+## Behavior Details
+
+### Dependency Detection
+
+Pixi automatically detects where the dependency is defined:
+
+1. Default dependencies (`[dependencies]`)
+2. Platform-specific dependencies (`[target.<platform>.dependencies]`)
+3. Feature dependencies (`[feature.<name>.dependencies]`)
+4. PyPI dependencies (`[pypi-dependencies]`)
+5. Build/host dependencies
+
+### Removing Unused Dependencies
+
+Removing a package doesn't remove its dependencies. Use `pixi update` to clean up:
+
+```bash
+pixi remove numpy
+pixi update  # Removes numpy's dependencies if no longer needed
+```
+
+### Lock File Update
+
+By default, `pixi remove`:
+
+1. Removes package from manifest
+2. Updates lock file
+3. Reinstalls environment
+
+Use `--no-install` to skip reinstallation:
+
+```bash
+pixi remove numpy --no-install
+pixi install  # Reinstall later
+```
+
+## Exit Status
+
+- `0`: Success
+- `1`: Package not found in specified location
+- `1`: Lock file update failed
+- `1`: Installation failed
+
+## Troubleshooting
+
+### Package Not Found
+
+Error: `package 'numpy' not found in dependencies`
+
+Solutions:
+
+1. Check if package exists:
+
+```bash
+pixi list | grep numpy
+```
+
+2. Check feature/platform:
+
+```bash
+# Package in feature
+pixi remove numpy --feature ml
+
+# Package in platform
+pixi remove numpy --platform linux-64
+```
+
+3. Check if it's a PyPI package:
+
+```bash
+pixi remove --pypi numpy
+```
+
+### Dependency Still Required
+
+Warning: Other packages may still depend on the removed package.
+
+Solution: Check dependencies:
+
+```bash
+pixi tree | grep numpy
+```
+
+The package will remain in the lock file if other packages need it.
+
+### Lock File Out of Sync
+
+Error: `lock file is out of sync`
+
+Solution:
+
+```bash
+# Update lock file first
+pixi install
+
+# Then remove
+pixi remove numpy
+```
+
+### Removing from Wrong Location
+
+If removing doesn't work, the package might be in:
+
+- Different feature: Try `--feature <name>`
+- Different platform: Try `--platform <platform>`  
+- PyPI section: Try `--pypi`
+- Build section: Try `--build`
+
+Inspect manifest to find exact location:
+
+```bash
+cat pixi.toml | grep -A 5 numpy
+```
+
+## Common Workflows
+
+### Clean Up Test Dependencies
+
+```bash
+pixi remove pytest pytest-cov pytest-mock --feature test
+```
+
+### Remove Platform-Specific CUDA
+
+```bash
+pixi remove cuda cudatoolkit --platform linux-64
+```
+
+### Remove All PyPI Dev Tools
+
+```bash
+pixi remove --pypi black flake8 mypy --feature dev
+```
+
+### Switch from Conda to PyPI Package
+
+```bash
+# Remove conda version
+pixi remove numpy
+
+# Add PyPI version
+pixi add --pypi numpy
+```
+
+## See Also
+
+- [pixi add](/commands/add) - Add dependencies
+- [pixi install](/commands/install) - Install dependencies  
+- [pixi update](/commands/update) - Update lock file
+- [pixi list](/commands/list) - List installed packages

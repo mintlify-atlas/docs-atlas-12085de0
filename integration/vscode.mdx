@@ -1,0 +1,331 @@
+---
+title: 'VS Code Integration'
+description: 'Use Pixi environments with Visual Studio Code'
+---
+
+[Visual Studio Code](https://code.visualstudio.com/) is a popular editor that can be extended to support most programming languages through extensions.
+
+## Python Extension
+
+The Python extension provides first-class Pixi environment support.
+
+<Steps>
+  <Step title="Install the Python Extension">
+    Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ms-python.python).
+  </Step>
+  
+  <Step title="Automatic Detection">
+    The extension automatically detects and selects the Pixi default environment when you open a Python file.
+    
+    ![VSCode Python Environment Selector](../../assets/vscode-python-env-selector.png)
+  </Step>
+  
+  <Step title="Manual Selection (if needed)">
+    If the environment isn't detected, open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P`) and run:
+    
+    ```
+    Python: Select Interpreter
+    ```
+    
+    Choose your Pixi environment from the list.
+  </Step>
+</Steps>
+
+### Features Available
+
+- IntelliSense and code completion
+- Debugging support
+- Test discovery and execution
+- Linting and formatting
+- Jupyter notebook support
+
+## Direnv Extension
+
+Direnv provides language-agnostic environment activation for VS Code.
+
+<Steps>
+  <Step title="Install Direnv Extension">
+    Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mkhl.direnv).
+  </Step>
+  
+  <Step title="Configure Direnv">
+    Create a `.envrc` file in your workspace root to enable automatic environment activation.
+  </Step>
+  
+  <Step title="Activate Environment">
+    VS Code will automatically load environment variables when you open the workspace.
+  </Step>
+</Steps>
+
+This works for any language supported by Pixi, not just Python.
+
+## Devcontainer Extension
+
+[Devcontainers](https://code.visualstudio.com/docs/devcontainers/containers) provide consistent development environments and work seamlessly with [GitHub Codespaces](https://github.com/features/codespaces).
+
+### Basic Setup
+
+<Steps>
+  <Step title="Create .devcontainer Directory">
+    ```bash
+    mkdir -p .devcontainer
+    ```
+  </Step>
+  
+  <Step title="Create Dockerfile">
+    ```dockerfile .devcontainer/Dockerfile
+    FROM mcr.microsoft.com/devcontainers/base:jammy
+    
+    ARG PIXI_VERSION=v0.65.0
+    
+    RUN curl -L -o /usr/local/bin/pixi -fsSL --compressed \
+        "https://github.com/prefix-dev/pixi/releases/download/${PIXI_VERSION}/pixi-$(uname -m)-unknown-linux-musl" \
+        && chmod +x /usr/local/bin/pixi \
+        && pixi info
+    
+    # Set user and workdir for VS Code compatibility
+    USER vscode
+    WORKDIR /home/vscode
+    
+    RUN echo 'eval "$(pixi completion -s bash)"' >> /home/vscode/.bashrc
+    ```
+  </Step>
+  
+  <Step title="Create devcontainer.json">
+    ```json .devcontainer/devcontainer.json
+    {
+      "name": "my-workspace",
+      "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+      },
+      "customizations": {
+        "vscode": {
+          "settings": {},
+          "extensions": [
+            "ms-python.python",
+            "charliermarsh.ruff",
+            "GitHub.copilot"
+          ]
+        }
+      },
+      "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+      },
+      "mounts": [
+        "source=${localWorkspaceFolderBasename}-pixi,target=${containerWorkspaceFolder}/.pixi,type=volume"
+      ],
+      "postCreateCommand": "sudo chown vscode .pixi && pixi install"
+    }
+    ```
+  </Step>
+  
+  <Step title="Open in Devcontainer">
+    - Click the green icon in the bottom-left corner
+    - Select "Reopen in Container"
+    - VS Code will build and start the container
+  </Step>
+</Steps>
+
+<Note>
+The `.pixi` directory is mounted as a volume to avoid case-sensitivity issues on macOS and Windows. Some conda packages contain files that differ only in case.
+</Note>
+
+### Why Use a Volume for .pixi?
+
+Default filesystem mounts on macOS and Windows are case-insensitive, but some conda packages (like [ncurses](https://github.com/conda-forge/ncurses-feedstock/issues/73)) contain files that differ only in case. Mounting `.pixi` as a volume solves this issue.
+
+### Adding Secrets
+
+For private conda channels, add authentication secrets:
+
+```json .devcontainer/devcontainer.json
+{
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    "options": [
+      "--secret",
+      "id=prefix_dev_token,env=PREFIX_DEV_TOKEN"
+    ]
+  }
+  // ...
+}
+```
+
+```dockerfile .devcontainer/Dockerfile
+# ...
+RUN --mount=type=secret,id=prefix_dev_token,uid=1000 \
+    test -s /run/secrets/prefix_dev_token \
+    && pixi auth login --token "$(cat /run/secrets/prefix_dev_token)" https://repo.prefix.dev
+```
+
+Secrets must be:
+- Set as environment variables when starting locally
+- Configured in [GitHub Codespaces Settings](https://github.com/settings/codespaces) under "Secrets"
+
+## Tasks Integration
+
+Run Pixi tasks directly from VS Code:
+
+### tasks.json Configuration
+
+```json .vscode/tasks.json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Pixi: Run Tests",
+      "type": "shell",
+      "command": "pixi run test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pixi: Start Dev Server",
+      "type": "shell",
+      "command": "pixi run dev",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Pixi: Lint",
+      "type": "shell",
+      "command": "pixi run lint",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}
+```
+
+### Running Tasks
+
+- Open Command Palette: `Ctrl+Shift+P` / `Cmd+Shift+P`
+- Run: `Tasks: Run Task`
+- Select your Pixi task
+
+## Launch Configuration
+
+Debug applications in Pixi environments:
+
+```json .vscode/launch.json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Pixi: Debug Python",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Pixi: Debug Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}"],
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ]
+}
+```
+
+## Workspace Settings
+
+Optimize VS Code for Pixi workspaces:
+
+```json .vscode/settings.json
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.pixi/envs/default/bin/python",
+  "python.terminal.activateEnvironment": false,
+  "files.watcherExclude": {
+    "**/.pixi/**": true
+  },
+  "search.exclude": {
+    "**/.pixi/**": true
+  },
+  "files.exclude": {
+    "**/.pixi/**": false
+  }
+}
+```
+
+This configuration:
+- Sets the default Python interpreter
+- Prevents auto-activation (Pixi handles this)
+- Excludes `.pixi` from file watching for performance
+- Excludes `.pixi` from search results
+- Keeps `.pixi` visible in the file explorer
+
+## Multi-Environment Projects
+
+For projects with multiple Pixi environments:
+
+```json .vscode/settings.json
+{
+  "python.envFile": "${workspaceFolder}/.env",
+  "python.terminal.activateEnvInCurrentTerminal": true
+}
+```
+
+Create environment-specific `.env` files:
+
+```bash .env.dev
+PIXI_ENVIRONMENT=dev
+```
+
+```bash .env.prod
+PIXI_ENVIRONMENT=prod
+```
+
+## Tips and Tricks
+
+<Card title="Auto-activate Terminal" icon="terminal">
+Pixi automatically activates environments in VS Code's integrated terminal.
+</Card>
+
+<Card title="Extension Sync" icon="sync">
+Use Settings Sync to share extensions and settings across machines.
+</Card>
+
+<Card title="Remote Development" icon="server">
+Use Remote-SSH extension to develop on remote machines with Pixi installed.
+</Card>
+
+<Card title="Multiple Workspaces" icon="folder-tree">
+Use VS Code workspaces to manage multiple Pixi projects simultaneously.
+</Card>
+
+## Troubleshooting
+
+### Environment Not Detected
+
+1. Reload the window: `Developer: Reload Window`
+2. Manually select interpreter via Command Palette
+3. Check that `.pixi/envs/default` exists
+
+### Slow Performance
+
+Add `.pixi` to watcher exclusions in settings (see Workspace Settings above).
+
+### Devcontainer Build Fails
+
+Check Docker logs:
+```bash
+docker logs <container-id>
+```
+
+Ensure secrets are properly configured for private channels.
+
+## Additional Resources
+
+- [VS Code Python Tutorial](https://code.visualstudio.com/docs/python/python-tutorial)
+- [Devcontainers Documentation](https://code.visualstudio.com/docs/devcontainers/containers)
+- [GitHub Codespaces](https://github.com/features/codespaces)
