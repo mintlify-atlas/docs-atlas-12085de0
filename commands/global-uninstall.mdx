@@ -1,0 +1,328 @@
+---
+title: pixi global uninstall
+description: Uninstall global environments from your system
+---
+
+The `pixi global uninstall` command removes one or more global environments from your system, including all their packages and exposed executables.
+
+## Usage
+
+```bash
+pixi global uninstall [OPTIONS] <ENVIRONMENT>...
+```
+
+## Arguments
+
+<ParamField path="ENVIRONMENT" type="string" required>
+  Name(s) of the environment(s) to uninstall. Multiple environments can be specified.
+</ParamField>
+
+```bash
+pixi global uninstall python311
+pixi global uninstall tools dev-tools
+```
+
+## Behavior
+
+### What Gets Removed
+
+When you uninstall a global environment:
+
+1. **Environment directory**: All packages and files are removed
+2. **Exposed executables**: Symlinks/shims in `~/.pixi/bin/` are removed
+3. **Manifest entry**: Environment is removed from the global manifest
+4. **Completions**: Shell completions for exposed executables are removed (Unix)
+
+### Multiple Environments
+
+You can uninstall multiple environments in a single command:
+
+```bash
+pixi global uninstall env1 env2 env3
+```
+
+Each environment is processed independently:
+- If one fails, others continue processing
+- Errors are collected and reported at the end
+
+### Error Handling
+
+<Note>
+  If an uninstall fails, pixi attempts to revert changes to maintain consistency.
+</Note>
+
+On error:
+1. Changes to that environment are reverted
+2. Other environments continue processing
+3. All errors are reported at the end
+
+## Examples
+
+### Uninstall Single Environment
+
+```bash
+pixi global uninstall python311
+```
+
+Removes the python311 environment completely.
+
+Example output:
+
+```text
+✅ Removed environment python311
+✅ Removed exposed executables: python3.11, pip3.11
+✅ Removed completions
+```
+
+### Uninstall Multiple Environments
+
+```bash
+pixi global uninstall tools dev-tools test-env
+```
+
+Removes all three environments.
+
+### Uninstall All Development Tools
+
+```bash
+# List environments first
+pixi global list
+
+# Uninstall specific ones
+pixi global uninstall pytest-env black-env ruff-env
+```
+
+### Clean Up Old Environments
+
+```bash
+pixi global list
+pixi global uninstall old-python python39 deprecated-tools
+```
+
+## State Changes Reported
+
+After successful uninstall, pixi reports:
+
+- Environment removed
+- Exposed executables removed
+- Completions removed (Unix)
+
+Example output:
+
+```text
+✅ Removed environment tools
+✅ Removed exposed executables: ruff, black
+✅ Removed completions for ruff, black
+```
+
+## Environment Locations
+
+Global environments are stored at:
+
+- **Unix/macOS**: `~/.pixi/envs/<environment>/`
+- **Windows**: `%USERPROFILE%\.pixi\envs\<environment>\`
+
+Exposed executables:
+
+- **Unix/macOS**: `~/.pixi/bin/`
+- **Windows**: `%USERPROFILE%\.pixi\bin\`
+
+## Verification
+
+### Before Uninstalling
+
+Check what will be removed:
+
+```bash
+pixi global list
+```
+
+Shows all environments and their exposed executables.
+
+### After Uninstalling
+
+Verify removal:
+
+```bash
+pixi global list
+# Environment should not appear
+
+which python3.11
+# Should show "not found" if that was the only exposure
+```
+
+## Common Use Cases
+
+### Remove Outdated Environment
+
+```bash
+# Uninstall old version
+pixi global uninstall python310
+
+# Install newer version
+pixi global install --environment python312 python=3.12
+```
+
+### Clean Up After Testing
+
+```bash
+pixi global install --environment test-env pytest
+# ... run tests ...
+pixi global uninstall test-env
+```
+
+### Remove Conflicting Environment
+
+```bash
+# Remove environment with conflicting executables
+pixi global uninstall conflicting-env
+
+# Reinstall with proper configuration
+pixi global install --environment new-env package --expose new-name=binary
+```
+
+## Troubleshooting
+
+### Environment Not Found
+
+Error: `Environment 'xyz' not found`
+
+Solution: List available environments:
+
+```bash
+pixi global list
+pixi global uninstall correct-name
+```
+
+### Permission Denied
+
+Error: `Permission denied` when removing files
+
+Solution: Check file permissions:
+
+```bash
+# Unix/macOS
+ls -la ~/.pixi/envs/
+chmod -R u+w ~/.pixi/envs/environment-name/
+pixi global uninstall environment-name
+```
+
+### Partial Removal
+
+If uninstall fails partway through:
+
+```bash
+# Pixi attempts to revert changes automatically
+# If needed, manually clean up:
+rm -rf ~/.pixi/envs/failed-env
+pixi global sync  # Resync state
+```
+
+### Multiple Environment Failures
+
+Some environments removed successfully, others failed:
+
+```text
+✅ Removed environment env1
+❌ Couldn't remove env2: permission denied
+✅ Removed environment env3
+
+Error: Some environments couldn't be removed.
+```
+
+Check error messages and retry failed ones:
+
+```bash
+pixi global uninstall env2  # Retry with fixes
+```
+
+## Comparison with Related Commands
+
+### uninstall vs remove
+
+- `pixi global uninstall`: Removes entire environment
+- `pixi global remove`: Removes specific packages from an environment
+
+```bash
+# Remove entire environment
+pixi global uninstall python311
+
+# Remove package from environment (keeps environment)
+pixi global remove --environment python311 numpy
+```
+
+## Safety Features
+
+<Warning>
+  Uninstalling an environment is permanent and removes all packages and exposed executables.
+</Warning>
+
+### Confirmation
+
+No confirmation prompt is shown by default. Double-check environment names before executing.
+
+### Reversion on Error
+
+If uninstall fails, pixi attempts to restore the environment to its previous state.
+
+### Multiple Environment Processing
+
+When uninstalling multiple environments:
+- Each is processed independently
+- Failure in one doesn't stop others
+- Errors are collected and reported together
+
+## Config Options
+
+<ParamField path="--tls-no-verify" type="boolean">
+  Disable TLS certificate verification.
+</ParamField>
+
+<ParamField path="--auth-file" type="string">
+  Path to authentication file.
+</ParamField>
+
+```bash
+pixi global uninstall myenv --tls-no-verify
+```
+
+## Advanced Usage
+
+### Scripting Bulk Uninstalls
+
+```bash
+# Uninstall all test environments
+pixi global list | grep test | awk '{print $1}' | xargs pixi global uninstall
+
+# Or with explicit list
+pixi global uninstall test1 test2 test3 test4
+```
+
+### Conditional Uninstall
+
+```bash
+# Check if environment exists before uninstalling
+if pixi global list | grep -q "myenv"; then
+    pixi global uninstall myenv
+fi
+```
+
+### Uninstall and Reinstall
+
+```bash
+# Clean reinstall
+pixi global uninstall python311
+pixi global install --environment python311 python=3.11 numpy pandas
+```
+
+## Exit Codes
+
+- `0`: All environments uninstalled successfully
+- `1`: One or more environments failed to uninstall
+
+## See Also
+
+- [pixi global remove](/commands/global-remove) - Remove packages from an environment
+- [pixi global install](/commands/global-install) - Install a new global environment
+- [pixi global list](/commands/global-list) - List global environments
+- [pixi global sync](/commands/global-sync) - Synchronize global environments

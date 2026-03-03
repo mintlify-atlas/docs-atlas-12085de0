@@ -1,0 +1,385 @@
+---
+title: pixi global expose
+description: Manage exposed binaries from global environments
+---
+
+The `pixi global expose` command manages which executables from global environments are exposed (made available) in your system PATH.
+
+## Usage
+
+```bash
+pixi global expose <SUBCOMMAND> [OPTIONS]
+```
+
+## Subcommands
+
+- `add` - Add exposed binaries from an environment
+- `remove` - Remove exposed binaries from the global environment
+
+## expose add
+
+Add exposed binaries from a global environment to your system PATH.
+
+### Usage
+
+```bash
+pixi global expose add [OPTIONS] --environment <ENV> <MAPPING>...
+```
+
+### Arguments
+
+<ParamField path="MAPPING" type="string" required>
+  Mapping that describes which executables are exposed.
+  
+  Format:
+  - `exposed_name=executable_name` - Expose executable with custom name
+  - `executable_name` - Expose executable with same name (shorthand for `executable_name=executable_name`)
+  
+  Multiple mappings can be specified.
+</ParamField>
+
+```bash
+pixi global expose add --environment python311 python3.11=python
+pixi global expose add --environment tools ruff black
+pixi global expose add -e myenv tool1=bin1 tool2=bin2
+```
+
+### Options
+
+<ParamField path="--environment" type="string" required>
+  The environment from which binaries should be exposed.
+  
+  Short flag: `-e`
+</ParamField>
+
+### Examples
+
+#### Expose with Custom Name
+
+```bash
+pixi global expose add --environment python311 python3.11=python python3=python
+```
+
+Exposes the `python` executable as both `python3.11` and `python3`.
+
+#### Expose with Default Name
+
+```bash
+pixi global expose add --environment tools ruff black mypy
+```
+
+Exposes ruff, black, and mypy using their default executable names.
+
+#### Expose Single Executable
+
+```bash
+pixi global expose add --environment pytest pytest=pytest
+```
+
+Or simply:
+
+```bash
+pixi global expose add --environment pytest pytest
+```
+
+#### Multiple Custom Mappings
+
+```bash
+pixi global expose add --environment python311 \
+  python=python3.11 \
+  pip=pip3.11 \
+  python3=python
+```
+
+Exposes multiple executables with different names.
+
+## expose remove
+
+Remove exposed binaries from the global environment.
+
+### Usage
+
+```bash
+pixi global expose remove [OPTIONS] <EXPOSED_NAME>...
+```
+
+### Arguments
+
+<ParamField path="EXPOSED_NAME" type="string" required>
+  The exposed name(s) that should be removed. Multiple names can be specified.
+  
+  This is the name you use to call the executable (e.g., `python3.11`), not the original executable name.
+</ParamField>
+
+```bash
+pixi global expose remove python3.11
+pixi global expose remove ruff black mypy
+```
+
+<Note>
+  The command automatically determines which environment contains each exposed name.
+</Note>
+
+### Examples
+
+#### Remove Single Exposure
+
+```bash
+pixi global expose remove python3.11
+```
+
+Removes the `python3.11` exposed executable.
+
+#### Remove Multiple Exposures
+
+```bash
+pixi global expose remove ruff black mypy
+```
+
+Removes multiple exposed executables at once.
+
+#### Remove All Python Exposures
+
+```bash
+pixi global expose remove python python3 python3.11 pip pip3 pip3.11
+```
+
+Removes all Python-related exposed executables.
+
+## How Exposure Works
+
+### Unix/macOS
+
+Exposed executables are symlinked to `~/.pixi/bin/`:
+
+```bash
+~/.pixi/bin/python3.11 -> ~/.pixi/envs/python311/bin/python
+~/.pixi/bin/ruff -> ~/.pixi/envs/tools/bin/ruff
+```
+
+Ensure `~/.pixi/bin` is in your PATH:
+
+```bash
+export PATH="$HOME/.pixi/bin:$PATH"
+```
+
+### Windows
+
+Exposed executables are made available through shims in `%USERPROFILE%\.pixi\bin\`.
+
+## Complete Examples
+
+### Set Up Python Environment with Multiple Exposures
+
+```bash
+# Install Python
+pixi global install --environment python311 python=3.11
+
+# Add multiple exposures
+pixi global expose add --environment python311 \
+  python3.11=python \
+  python3=python \
+  python=python \
+  pip3.11=pip \
+  pip3=pip \
+  pip=pip
+
+# Verify
+which python3.11
+which python3
+which python
+```
+
+### Manage Tool Exposures
+
+```bash
+# Install tools
+pixi global install --environment tools ruff black mypy
+
+# Expose with default names
+pixi global expose add --environment tools ruff black mypy
+
+# Later, remove one
+pixi global expose remove mypy
+
+# Re-expose with custom name
+pixi global expose add --environment tools mypy-check=mypy
+```
+
+### Resolve Naming Conflicts
+
+```bash
+# You have Python in two environments
+pixi global install --environment python311 python=3.11
+pixi global install --environment python312 python=3.12
+
+# Expose each with version-specific names
+pixi global expose add --environment python311 python3.11=python py311=python
+pixi global expose add --environment python312 python3.12=python py312=python
+
+# Set the default python
+pixi global expose add --environment python312 python=python python3=python
+```
+
+### Change Exposure After Installation
+
+```bash
+# Initial installation with auto-exposure
+pixi global install --environment tools ruff
+
+# Remove auto-exposed
+pixi global expose remove ruff
+
+# Re-expose with custom name
+pixi global expose add --environment tools ruff-check=ruff
+```
+
+## State Changes Reported
+
+After successful expose operations:
+
+### Add Output
+
+```text
+✅ Exposed python3.11 -> python
+✅ Exposed pip3.11 -> pip
+✅ Updated completions
+```
+
+### Remove Output
+
+```text
+✅ Removed exposure python3.11
+✅ Updated completions
+```
+
+## Troubleshooting
+
+### Executable Not Found in Environment
+
+Error: `executable 'xyz' not found in environment 'myenv'`
+
+Solution: Verify the executable exists:
+
+```bash
+pixi global list --environment myenv
+# Check which executables are available
+```
+
+### Exposed Name Already Exists
+
+Error: `exposed name 'python' already exists`
+
+Solution: Remove the existing exposure first:
+
+```bash
+pixi global expose remove python
+pixi global expose add --environment newenv python=python
+```
+
+### Environment Not Found
+
+Error: `Environment 'xyz' not found`
+
+Solution: Check environment name:
+
+```bash
+pixi global list
+pixi global expose add --environment correct-name executable
+```
+
+### Exposed Binary Not in PATH
+
+After exposing, executable not found:
+
+Solution: Ensure `~/.pixi/bin` is in your PATH:
+
+```bash
+# Unix/macOS - add to ~/.bashrc or ~/.zshrc
+export PATH="$HOME/.pixi/bin:$PATH"
+
+# Reload shell
+source ~/.bashrc
+
+# Verify
+echo $PATH
+which exposed-binary
+```
+
+### Exposure Removed but Binary Still Works
+
+Binary might be exposed from another environment or installed separately:
+
+```bash
+# Check all exposures
+pixi global list
+
+# Check which binary is being used
+which binary-name
+```
+
+## Error Handling
+
+<Note>
+  If an expose operation fails, pixi automatically reverts changes to maintain consistency.
+</Note>
+
+On error:
+1. Changes to the environment are rolled back
+2. Symlinks/shims are restored to previous state
+3. Error details are reported
+
+## Config Options
+
+<ParamField path="--tls-no-verify" type="boolean">
+  Disable TLS certificate verification.
+</ParamField>
+
+<ParamField path="--auth-file" type="string">
+  Path to authentication file.
+</ParamField>
+
+```bash
+pixi global expose add --environment myenv tool --tls-no-verify
+```
+
+## Best Practices
+
+### Use Version-Specific Names
+
+```bash
+pixi global expose add --environment python311 \
+  python3.11=python \
+  python3=python \
+  python=python
+```
+
+This prevents conflicts when multiple versions are installed.
+
+### Document Custom Mappings
+
+Keep track of custom exposures:
+
+```bash
+# View current exposures
+pixi global list
+
+# Or check manifest
+pixi global edit
+```
+
+### Remove Unused Exposures
+
+Clean up exposures you no longer need:
+
+```bash
+pixi global list
+pixi global expose remove unused-tool1 unused-tool2
+```
+
+## See Also
+
+- [pixi global install](/commands/global-install) - Install global environments (with auto-exposure)
+- [pixi global add](/commands/global-add) - Add packages and expose executables
+- [pixi global list](/commands/global-list) - View exposed executables
+- [pixi global remove](/commands/global-remove) - Remove packages from environments

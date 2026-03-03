@@ -1,0 +1,457 @@
+---
+title: pixi global update
+description: Update global environments to their latest versions
+---
+
+The `pixi global update` command updates packages in global environments to their latest compatible versions, maintaining executable exposures.
+
+## Usage
+
+```bash
+pixi global update [OPTIONS] [ENVIRONMENT]...
+```
+
+## Arguments
+
+<ParamField path="ENVIRONMENT" type="string">
+  Name(s) of environment(s) to update. If not specified, updates all environments.
+  
+  Multiple environments can be specified.
+</ParamField>
+
+```bash
+pixi global update python311
+pixi global update tools dev-tools
+pixi global update  # Updates all environments
+```
+
+## Behavior
+
+### Updating All Environments
+
+When no environments are specified:
+
+```bash
+pixi global update
+```
+
+This will:
+1. Prune old/unused environments and completions
+2. Update all environments to latest package versions
+3. Maintain all executable exposures
+4. Update shell completions
+
+### Updating Specific Environments
+
+When environments are specified:
+
+```bash
+pixi global update python311 tools
+```
+
+This will:
+1. Update packages in specified environments only
+2. Preserve executable exposure configurations
+3. Update completions for affected environments
+
+### Exposure Preservation
+
+<Note>
+  The update command intelligently maintains executable exposures:
+  - If all executables were auto-exposed, new executables are also exposed
+  - If only specific executables were exposed, the same subset is maintained
+</Note>
+
+### Update Process
+
+For each environment:
+1. Check if environment is in sync
+2. Detect currently exposed executables
+3. Install latest package versions
+4. Sync executable exposures (preserving exposure strategy)
+5. Update shortcuts and completions
+
+## Examples
+
+### Update All Environments
+
+```bash
+pixi global update
+```
+
+Example output:
+
+```text
+✅ Pruned old environments
+✅ Updated environment python311
+   • python 3.11.7 -> 3.11.8
+   • pip 23.3.1 -> 24.0
+✅ Updated environment tools
+   • ruff 0.1.9 -> 0.2.0
+   • black 24.1.0 -> 24.1.1
+✅ Updated completions
+```
+
+### Update Single Environment
+
+```bash
+pixi global update python311
+```
+
+Updates only the python311 environment.
+
+### Update Multiple Specific Environments
+
+```bash
+pixi global update tools dev-tools test-env
+```
+
+Updates three environments, leaving others unchanged.
+
+### Update with Dry Run
+
+```bash
+# List what would be updated (check with list first)
+pixi global list
+pixi global update
+```
+
+## State Changes Reported
+
+After successful update, pixi reports:
+
+- Package version changes
+- Newly exposed executables
+- Updated completions
+
+Example output:
+
+```text
+✅ Updated environment python311
+   • numpy 1.26.0 -> 1.26.4
+   • pandas 2.1.3 -> 2.2.0
+✅ Exposed new executable: pandas-profiler
+✅ Updated completions for pandas-profiler
+```
+
+## Comparison with Related Commands
+
+### update vs upgrade
+
+- `pixi global update`: Updates packages within version constraints from manifest
+- `pixi global upgrade`: (Deprecated) Use `pixi global update` instead
+
+### update vs install
+
+- `pixi global update`: Updates existing environments
+- `pixi global install`: Creates or reinstalls environments
+
+### update vs sync
+
+- `pixi global update`: Installs latest versions, modifying lock
+- `pixi global sync`: Installs exact versions from manifest/lock without updating
+
+## When to Use Update
+
+### Regular Maintenance
+
+Update all environments periodically:
+
+```bash
+# Weekly or monthly
+pixi global update
+```
+
+### After Manifest Changes
+
+After manually editing the global manifest:
+
+```bash
+pixi global edit
+# ... make changes ...
+pixi global update
+```
+
+### Security Updates
+
+Get latest security patches:
+
+```bash
+pixi global update
+```
+
+### New Features
+
+Update specific tools to get new features:
+
+```bash
+pixi global update tools
+```
+
+## Exposure Strategy Detection
+
+### Auto-Expose All
+
+If all executables were previously exposed:
+
+```bash
+# Before update: ruff and black exposed
+# After update: ruff, black, and new-tool all exposed
+pixi global update tools
+```
+
+### Manual Exposure
+
+If only specific executables were exposed:
+
+```bash
+# Before update: only pytest exposed (not pytest-cov)
+# After update: still only pytest exposed
+pixi global update test-env
+```
+
+To expose new executables after update:
+
+```bash
+pixi global expose add --environment test-env pytest-cov
+```
+
+## Pruning Old Environments
+
+When updating all environments, pixi automatically:
+
+- Removes environments not in the manifest
+- Cleans up orphaned completion files (Unix)
+- Removes unused directories
+
+```bash
+pixi global update  # Includes pruning
+```
+
+Example output:
+
+```text
+✅ Pruned environment old-python
+✅ Removed orphaned completions
+```
+
+## Update Failures
+
+<Warning>
+  If an update fails, pixi reverts the environment to its previous state.
+</Warning>
+
+Example:
+
+```text
+✅ Updated environment python311
+❌ Failed to update environment tools: version conflict
+   Reverting tools to previous state...
+✅ Reverted environment tools
+```
+
+The error doesn't affect other environments:
+
+```bash
+# python311 remains updated
+# tools reverted to previous state
+```
+
+## Troubleshooting
+
+### Version Conflicts
+
+Error: `cannot satisfy version constraints`
+
+Solution: Check dependencies in manifest:
+
+```bash
+pixi global edit
+# Review and adjust version constraints
+pixi global update
+```
+
+### Package Not Found
+
+Error: `package 'xyz' not found`
+
+Solution: Package may have been removed or renamed:
+
+```bash
+pixi search package-name
+pixi global edit  # Update package name
+pixi global update
+```
+
+### Environment Out of Sync
+
+Warning: `environment not in sync`
+
+The update command automatically syncs before updating:
+
+```bash
+pixi global update myenv
+# Syncs if needed, then updates
+```
+
+### Exposure Changes
+
+Unexpected executables exposed/removed:
+
+Check exposure strategy:
+
+```bash
+pixi global list
+# Manually adjust exposures
+pixi global expose add --environment myenv missing-tool
+pixi global expose remove unwanted-tool
+```
+
+### Update Taking Too Long
+
+Update specific environments instead of all:
+
+```bash
+# Instead of
+pixi global update
+
+# Try
+pixi global update frequently-used-env
+```
+
+## Advanced Usage
+
+### Update Before Running
+
+Ensure tools are up-to-date before use:
+
+```bash
+pixi global update tools && ruff check .
+```
+
+### Selective Updates
+
+Update only production environments:
+
+```bash
+pixi global update prod staging
+```
+
+Keep development environments on specific versions:
+
+```bash
+# Don't update dev environments
+# Update only prod
+pixi global update prod
+```
+
+### Update and Test
+
+```bash
+pixi global update python311
+python3.11 --version
+pip3.11 list
+```
+
+### Batch Update Script
+
+```bash
+#!/bin/bash
+echo "Updating all global environments..."
+pixi global update
+echo "Verifying installations..."
+pixi global list
+```
+
+## Performance Considerations
+
+<Tip>
+  Updating specific environments is faster than updating all:
+</Tip>
+
+```bash
+# Faster - updates only one environment
+pixi global update tools
+
+# Slower - updates all environments
+pixi global update
+```
+
+## Config Options
+
+<ParamField path="--tls-no-verify" type="boolean">
+  Disable TLS certificate verification.
+</ParamField>
+
+<ParamField path="--auth-file" type="string">
+  Path to authentication file.
+</ParamField>
+
+```bash
+pixi global update --tls-no-verify
+```
+
+## Best Practices
+
+### Regular Updates
+
+Schedule regular updates:
+
+```bash
+# Weekly
+pixi global update
+
+# Or use a cron job
+0 0 * * 0 /usr/local/bin/pixi global update
+```
+
+### Review Changes
+
+Check what changed after update:
+
+```bash
+pixi global list > before.txt
+pixi global update
+pixi global list > after.txt
+diff before.txt after.txt
+```
+
+### Pin Critical Versions
+
+For stability-critical environments, pin versions:
+
+```bash
+pixi global edit
+```
+
+```toml
+[envs.prod.dependencies]
+python = "==3.11.8"  # Pin exact version
+numpy = ">=1.26,<1.27"  # Allow minor updates
+```
+
+### Test After Update
+
+Verify critical tools work after update:
+
+```bash
+pixi global update python311
+python3.11 -c "import numpy; print(numpy.__version__)"
+```
+
+## Environment Variables
+
+No environment variables affect `pixi global update`.
+
+## Exit Codes
+
+- `0`: All environments updated successfully
+- `1`: One or more environments failed to update
+
+## See Also
+
+- [pixi global install](/commands/global-install) - Install global environments
+- [pixi global sync](/commands/global-sync) - Sync environments without updating
+- [pixi global list](/commands/global-list) - View current environment versions
+- [pixi global upgrade](/commands/global-upgrade) - (Deprecated, use update instead)
+- [pixi global upgrade-all](/commands/global-upgrade-all) - (Deprecated, use update instead)

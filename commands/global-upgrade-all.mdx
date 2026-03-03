@@ -1,0 +1,268 @@
+---
+title: pixi global upgrade-all
+description: Deprecated command - use pixi global update instead
+---
+
+The `pixi global upgrade-all` command has been removed. Use `pixi global update` instead for updating all globally installed packages.
+
+<Warning>
+  This command has been deprecated and removed. Use `pixi global update` instead.
+</Warning>
+
+## Migration
+
+### Old Command
+
+```bash
+pixi global upgrade-all
+```
+
+### New Command
+
+```bash
+pixi global update
+```
+
+The `pixi global update` command provides the same functionality with improved features.
+
+## Why This Command Was Removed
+
+The `upgrade-all` command was replaced by the more flexible `update` command which:
+
+- Updates all environments by default (same as `upgrade-all`)
+- Allows updating specific environments
+- Better handles environment state and exposures
+- Provides more detailed output
+- Has improved error handling
+
+## Replacement Examples
+
+### Update All Environments
+
+**Old:**
+```bash
+pixi global upgrade-all
+```
+
+**New:**
+```bash
+pixi global update
+```
+
+### Update with Options
+
+**Old:**
+```bash
+pixi global upgrade-all --platform linux-64
+```
+
+**New:**
+```bash
+pixi global update
+```
+
+Note: Platform is automatically detected in the new command.
+
+## Error Message
+
+If you try to run `pixi global upgrade-all`, you'll see:
+
+```text
+Error: `pixi global upgrade-all` has been removed
+  You can call `pixi global update` for most use cases
+```
+
+## What Changed
+
+The `pixi global update` command provides:
+
+1. **Same default behavior**: Updates all environments when no arguments provided
+2. **Selective updates**: Can update specific environments
+3. **Better state management**: Properly tracks exposure strategies
+4. **Improved output**: Shows detailed update information
+
+### Update All (Same as upgrade-all)
+
+```bash
+pixi global update
+```
+
+This updates all global environments, just like `upgrade-all` did.
+
+### Update Specific Environments (New Feature)
+
+```bash
+pixi global update python311 tools
+```
+
+This wasn't possible with `upgrade-all`.
+
+## Configuration
+
+The old command used these options:
+- `--channels`: No longer needed, channels are read from manifest
+- `--platform`: Automatically detected
+
+These are now managed through the global manifest:
+
+```bash
+pixi global edit  # Edit global manifest to configure channels
+pixi global update  # Update with those settings
+```
+
+## Related Commands
+
+### Current Update Commands
+
+- `pixi global update` - Update all or specific environments
+- `pixi global upgrade` - (Also deprecated, use `update`)
+
+### Other Global Commands
+
+- `pixi global install` - Install new environments
+- `pixi global list` - List installed environments
+- `pixi global sync` - Sync environments without updating
+
+## Complete Migration Guide
+
+### Scenario 1: Regular Updates
+
+**Before:**
+```bash
+# Weekly update routine
+pixi global upgrade-all
+```
+
+**After:**
+```bash
+# Same routine
+pixi global update
+```
+
+### Scenario 2: Update Specific Tools
+
+**Before:**
+```bash
+# Had to update everything
+pixi global upgrade-all
+```
+
+**After:**
+```bash
+# Can update just what you need
+pixi global update tools dev-tools
+```
+
+### Scenario 3: With Custom Channels
+
+**Before:**
+```bash
+pixi global upgrade-all --channels conda-forge,bioconda
+```
+
+**After:**
+```bash
+# Configure channels in manifest first
+pixi global edit
+# Add channels to environments, then:
+pixi global update
+```
+
+### Scenario 4: Automation Scripts
+
+**Before:**
+```bash
+#!/bin/bash
+pixi global upgrade-all
+```
+
+**After:**
+```bash
+#!/bin/bash
+pixi global update
+```
+
+## Frequently Asked Questions
+
+### Why was upgrade-all removed?
+
+The command was redundant with `pixi global update`, which offers the same functionality and more.
+
+### Will my scripts break?
+
+Yes, if they use `pixi global upgrade-all`. Update them to use `pixi global update` instead.
+
+### Is there any difference in behavior?
+
+The core update behavior is the same, but `pixi global update` has:
+- Better exposure handling
+- More detailed output
+- Ability to update specific environments
+- Improved error messages
+
+### Can I still use the old command?
+
+No, it has been completely removed. You must use `pixi global update`.
+
+## Upgrade Checklist
+
+Update your workflows:
+
+- [ ] Replace `pixi global upgrade-all` with `pixi global update` in scripts
+- [ ] Remove `--channels` and `--platform` flags (now managed via manifest)
+- [ ] Update CI/CD pipelines
+- [ ] Update documentation
+- [ ] Notify team members
+
+## Benefits of the New Command
+
+### Selective Updates
+
+```bash
+# Update only critical environments
+pixi global update prod
+
+# Update everything
+pixi global update
+```
+
+### Better Output
+
+```text
+✅ Updated environment python311
+   • python 3.11.7 -> 3.11.8
+   • pip 23.3.1 -> 24.0
+✅ Updated environment tools
+   • ruff 0.1.9 -> 0.2.0
+```
+
+### Improved Error Handling
+
+```text
+✅ Updated environment python311
+❌ Failed to update environment tools: version conflict
+   Reverting tools to previous state...
+✅ Reverted environment tools
+```
+
+## Timeline
+
+The command was:
+- **Deprecated**: Version 0.x.x
+- **Marked as hidden**: Version 0.x.x  
+- **Removed**: Current version
+
+## Support
+
+If you have issues migrating from `upgrade-all` to `update`:
+
+1. Check the [pixi global update](/commands/global-update) documentation
+2. Review your global manifest: `pixi global edit`
+3. Test the update: `pixi global list` before and after
+
+## See Also
+
+- [pixi global update](/commands/global-update) - Current command for updating environments
+- [pixi global upgrade](/commands/global-upgrade) - Also deprecated
+- [pixi global list](/commands/global-list) - View installed environments
+- [pixi global sync](/commands/global-sync) - Sync without updating

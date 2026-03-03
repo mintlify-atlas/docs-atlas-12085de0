@@ -1,0 +1,371 @@
+---
+title: pixi self-update
+description: Update pixi to the latest version or a specific version
+---
+
+The `pixi self-update` command updates the pixi binary to the latest version or downgrades to a specific version.
+
+## Usage
+
+```bash
+pixi self-update [OPTIONS]
+```
+
+## Options
+
+### Version Selection
+
+<ParamField path="--version" type="string">
+  Specify the desired version to upgrade or downgrade to.
+  
+  Format: `X.Y.Z` (without leading 'v')
+  
+  If not specified, updates to the latest version.
+</ParamField>
+
+```bash
+pixi self-update --version 0.25.0
+pixi self-update  # Updates to latest
+```
+
+<Note>
+  Leading 'v' characters are automatically removed if provided (e.g., `v0.25.0` becomes `0.25.0`).
+</Note>
+
+### Dry Run
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be updated without actually modifying the binary.
+  
+  Displays release notes and version changes without performing the update.
+</ParamField>
+
+```bash
+pixi self-update --dry-run
+pixi self-update --version 0.24.0 --dry-run
+```
+
+Example output:
+
+```text
+📝 Release notes for version 0.25.0 (2024-03-15):
+
+## Added
+- New workspace command for managing projects
+- Support for import command
+
+## Fixed
+- Lock file consistency issues
+- Windows path handling
+
+ℹ️  Pixi version would be updated from 0.24.0 to 0.25.0, but `--dry-run` given.
+```
+
+### Force Update
+
+<ParamField path="--force" type="boolean" default="false">
+  Force download and replace even if versions match.
+  
+  - With `--version`: Downloads specified version even if it's already installed
+  - Without `--version`: Always downloads and replaces with the latest version
+</ParamField>
+
+```bash
+pixi self-update --force
+pixi self-update --version 0.25.0 --force
+```
+
+### Skip Release Notes
+
+<ParamField path="--no-release-note" type="boolean" default="false">
+  Skip printing release notes during update.
+  
+  Useful for automated scripts or CI/CD pipelines.
+</ParamField>
+
+```bash
+pixi self-update --no-release-note
+```
+
+## Behavior
+
+### Automatic Version Detection
+
+When no `--version` is specified:
+
+```bash
+pixi self-update
+```
+
+1. Fetches the latest release from GitHub
+2. Compares with current version
+3. Downloads and installs if newer version is available
+
+### Version Comparison
+
+The command handles different scenarios:
+
+- **Up to date**: No action taken, displays current version
+- **Upgrade**: Newer version available, downloads and installs
+- **Downgrade**: Older version specified, prompts for confirmation (unless `--force` or `--version` is used)
+
+### Downgrade Confirmation
+
+When downgrading without explicit version:
+
+```bash
+# If latest remote is 0.24.0 but you have 0.25.0
+pixi self-update
+```
+
+Prompts:
+
+```text
+Current version (0.25.0) is more recent than remote (0.24.0). Do you want to downgrade? [y/N]
+```
+
+Skip prompt by specifying version:
+
+```bash
+pixi self-update --version 0.24.0  # No prompt
+```
+
+### Release Notes
+
+By default, release notes are displayed before updating:
+
+```text
+📝 Release notes for version 0.25.0 (2024-03-15):
+
+## Added
+- New import command for environment files
+- Workspace subcommands for manifest management
+
+## Changed
+- Improved lock file performance
+
+## Fixed
+- Resolved platform-specific installation issues
+
+✅ Pixi will be updated from 0.24.0 to 0.25.0
+✅ Pixi archive downloaded.
+✅ Pixi archive uncompressed.
+✅ Pixi has been updated to version 0.25.0.
+```
+
+## Examples
+
+### Update to Latest Version
+
+```bash
+pixi self-update
+```
+
+Output:
+
+```text
+✅ Pixi will be updated from 0.24.0 to 0.25.0
+✅ Pixi archive downloaded.
+✅ Pixi archive uncompressed.
+✅ Pixi has been updated to version 0.25.0.
+```
+
+### Check for Updates (Dry Run)
+
+```bash
+pixi self-update --dry-run
+```
+
+Shows what would be updated without changing anything.
+
+### Update to Specific Version
+
+```bash
+pixi self-update --version 0.24.0
+```
+
+Downloads and installs version 0.24.0.
+
+### Downgrade to Older Version
+
+```bash
+pixi self-update --version 0.23.0
+```
+
+Downgrades from current version to 0.23.0 (prompts for confirmation if needed).
+
+### Force Reinstall Current Version
+
+```bash
+pixi self-update --force
+```
+
+Redownloads and reinstalls even if already on the latest version.
+
+### Silent Update (No Release Notes)
+
+```bash
+pixi self-update --no-release-note
+```
+
+Updates without displaying release notes.
+
+### Automated Update in CI
+
+```bash
+pixi self-update --no-release-note --force
+```
+
+Ideal for CI/CD pipelines where you always want the latest version.
+
+## Platform Support
+
+Supported platforms:
+
+- **Linux**: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`
+- **macOS**: `x86_64-apple-darwin`, `aarch64-apple-darwin`
+- **Windows**: `x86_64-pc-windows-msvc`, `aarch64-pc-windows-msvc`
+
+The correct binary is automatically detected based on your system.
+
+## Update Process
+
+1. **Fetch version information**: Queries GitHub for latest release or specified version
+2. **Display release notes**: Shows what's changed (unless `--no-release-note`)
+3. **Download archive**: Downloads platform-specific binary archive
+4. **Extract binary**: Unpacks the archive to temporary directory
+5. **Replace binary**: Replaces current pixi binary with new version
+6. **Verify**: New version is immediately available
+
+## Troubleshooting
+
+### Download Failed
+
+Error: `Failed to download the archive`
+
+Solution: Check internet connection and GitHub availability:
+
+```bash
+# Try again
+pixi self-update
+
+# Or download manually from
+# https://github.com/prefix-dev/pixi/releases
+```
+
+### Version Not Found
+
+Error: `URL returned 404`
+
+Solution: Verify the version exists:
+
+```bash
+# Check available versions at
+# https://github.com/prefix-dev/pixi/releases
+
+pixi self-update --version 0.25.0  # Use valid version
+```
+
+### Permission Denied
+
+Error: `Permission denied` when replacing binary
+
+Solution: Ensure you have write permissions:
+
+```bash
+# On Unix systems, you may need to make the binary writable
+chmod u+w $(which pixi)
+pixi self-update
+```
+
+### Already Up to Date
+
+Message: `pixi is already up-to-date`
+
+To reinstall anyway:
+
+```bash
+pixi self-update --force
+```
+
+### Release Notes Failed to Fetch
+
+Warning: `Failed to fetch release notes`
+
+The update continues despite this warning. Check the release page manually:
+
+```text
+https://github.com/prefix-dev/pixi/releases/tag/vX.Y.Z
+```
+
+## Self-Update Disabled Builds
+
+<Warning>
+  Some pixi installations (e.g., via package managers like Homebrew, apt, or Conda) may have self-update disabled.
+</Warning>
+
+Error message:
+
+```text
+This version of pixi was built without self-update support.
+Please use your package manager to update pixi.
+```
+
+Solution:
+
+```bash
+# Homebrew (macOS)
+brew upgrade pixi
+
+# Conda
+conda update -c conda-forge pixi
+
+# apt (Ubuntu/Debian)
+sudo apt update && sudo apt upgrade pixi
+
+# Or download from GitHub
+curl -fsSL https://pixi.sh/install.sh | bash
+```
+
+## Environment Variables
+
+No environment variables affect `pixi self-update`.
+
+## Exit Codes
+
+- `0`: Success (updated or already up-to-date)
+- `1`: Error (download failed, permission denied, etc.)
+
+## Security
+
+<Tip>
+  The self-update mechanism downloads binaries from official GitHub releases at `https://github.com/prefix-dev/pixi/releases`.
+</Tip>
+
+All downloads are verified by:
+- Using HTTPS for secure transport
+- Respecting system TLS configuration
+- Using official GitHub release artifacts
+
+## Version Format
+
+Versions follow [Semantic Versioning](https://semver.org/):
+
+- Format: `MAJOR.MINOR.PATCH`
+- Example: `0.25.0`
+
+Do not include the 'v' prefix:
+
+```bash
+# ✅ Correct
+pixi self-update --version 0.25.0
+
+# ⚠️ Works but shows warning
+pixi self-update --version v0.25.0
+```
+
+## See Also
+
+- [pixi --version](/reference/cli) - Show current pixi version
+- [GitHub Releases](https://github.com/prefix-dev/pixi/releases) - View all available versions
+- [Changelog](https://github.com/prefix-dev/pixi/blob/main/CHANGELOG.md) - Detailed version history

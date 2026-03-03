@@ -1,0 +1,274 @@
+---
+title: pixi global add
+description: Add dependencies to a global environment
+---
+
+The `pixi global add` command adds dependencies to an existing global environment and updates the global manifest.
+
+## Usage
+
+```bash
+pixi global add [OPTIONS] --environment <ENV> <PACKAGE>...
+```
+
+## Arguments
+
+<ParamField path="PACKAGE" type="string" required>
+  Package specification to add to the global environment. Can be:
+  - Package name: `python`
+  - Version constraint: `python=3.11.*`
+  - MatchSpec: `python>=3.11,<3.12`
+  
+  Multiple packages can be specified.
+</ParamField>
+
+```bash
+pixi global add --environment python311 numpy pandas
+pixi global add --environment tools ruff black
+```
+
+## Options
+
+### Environment Selection
+
+<ParamField path="--environment" type="string" required>
+  Specifies the environment that dependencies should be added to.
+  
+  Short flag: `-e`
+  
+  The environment must already exist. Use `pixi global install` to create new environments.
+</ParamField>
+
+```bash
+pixi global add --environment myenv numpy
+pixi global add -e python311 scipy
+```
+
+<Warning>
+  If the environment doesn't exist, you'll receive an error:
+  
+  `Environment xyz doesn't exist. You can create a new environment with 'pixi global install'.`
+</Warning>
+
+### Expose Executables
+
+<ParamField path="--expose" type="string">
+  Add one or more mappings describing which executables are exposed.
+  
+  Format: `exposed_name=executable_name` or just `executable_name` (which becomes `executable_name=executable_name`).
+  
+  Can be specified multiple times.
+</ParamField>
+
+```bash
+pixi global add --environment python311 python --expose python3.11=python
+pixi global add -e tools pytest --expose pytest
+pixi global add -e myenv mypackage --expose tool1=bin1 --expose tool2=bin2
+```
+
+## Behavior
+
+### Adding Dependencies
+
+When you add dependencies to a global environment:
+
+1. Dependencies are added to the global manifest
+2. The environment is synced (packages are installed)
+3. Executables are exposed based on `--expose` flags
+4. Completions are updated (on Unix systems)
+
+### Package Installation
+
+The command installs or upgrades packages:
+
+- **New packages**: Installed with their dependencies
+- **Existing packages**: Upgraded to meet the new specification
+- **Dependencies**: Automatically resolved and installed
+
+### Executable Exposure
+
+Exposed executables are made available system-wide:
+
+- On Unix: Symlinked to `~/.pixi/bin/`
+- On Windows: Added to PATH through shims
+
+## Examples
+
+### Add Single Package
+
+```bash
+pixi global add --environment python311 numpy
+```
+
+Adds numpy to the python311 environment.
+
+### Add Multiple Packages
+
+```bash
+pixi global add --environment data-tools pandas matplotlib seaborn
+```
+
+Adds multiple data science packages at once.
+
+### Add with Version Constraint
+
+```bash
+pixi global add --environment myenv "python=3.11.*"
+pixi global add -e tools "ruff>=0.1.0,<0.2"
+```
+
+Adds packages with specific version constraints.
+
+### Add and Expose Executables
+
+```bash
+pixi global add --environment python311 python --expose python3.11=python --expose python3=python
+```
+
+Adds Python and exposes it as both `python3.11` and `python3`.
+
+### Add with Simple Exposure
+
+```bash
+pixi global add --environment tools pytest --expose pytest
+```
+
+Exposes pytest using its default name.
+
+### Add Multiple Packages with Exposure
+
+```bash
+pixi global add --environment myenv pytest pytest-cov --expose pytest=pytest
+```
+
+Adds pytest and pytest-cov, exposing only the pytest executable.
+
+## Common Use Cases
+
+### Add Tools to Existing Environment
+
+```bash
+# Create environment with Python
+pixi global install --environment dev python=3.11
+
+# Add development tools
+pixi global add --environment dev black ruff mypy
+pixi global add --environment dev pytest pytest-cov --expose pytest
+```
+
+### Upgrade Package Version
+
+```bash
+# Upgrade to newer version
+pixi global add --environment tools "ruff>=0.2.0"
+```
+
+This updates the constraint and upgrades the package if needed.
+
+### Add Package with Multiple Exposed Names
+
+```bash
+pixi global add --environment python311 python \
+  --expose python3.11=python \
+  --expose python3=python \
+  --expose python=python
+```
+
+Exposes Python under multiple aliases.
+
+## Error Handling
+
+### Environment Doesn't Exist
+
+Error: `Environment xyz doesn't exist`
+
+Solution: Create the environment first:
+
+```bash
+pixi global install --environment xyz python
+pixi global add --environment xyz numpy
+```
+
+### Package Not Found
+
+Error: `package 'numpyy' not found`
+
+Solution: Check package name:
+
+```bash
+pixi search numpy
+pixi global add --environment myenv numpy
+```
+
+### Version Conflict
+
+Error: `cannot satisfy version constraint`
+
+Solution: Adjust version constraints or check compatibility:
+
+```bash
+# Relax constraints
+pixi global add --environment myenv "numpy>=1.20"
+```
+
+### Reversion on Error
+
+<Note>
+  If the add operation fails, pixi automatically reverts the environment to its previous state.
+</Note>
+
+## State Changes Reported
+
+After a successful add, pixi reports:
+
+- Packages added with versions
+- Executables exposed
+- Completions updated
+
+Example output:
+
+```text
+✅ Added numpy 1.26.0 to environment myenv
+✅ Exposed python3.11 -> python
+✅ Updated completions
+```
+
+## Comparison with Related Commands
+
+### global add vs global install
+
+- `pixi global install`: Creates a new environment or reinstalls existing one
+- `pixi global add`: Adds dependencies to an existing environment
+
+### global add vs add
+
+- `pixi add`: Adds dependencies to workspace project
+- `pixi global add`: Adds dependencies to global environment (user-level)
+
+## Global Manifest Location
+
+The global manifest is stored at:
+
+- Unix: `~/.pixi/manifests/pixi-global.toml`
+- Windows: `%USERPROFILE%\.pixi\manifests\pixi-global.toml`
+
+## Config Options
+
+<ParamField path="--tls-no-verify" type="boolean">
+  Disable TLS certificate verification.
+</ParamField>
+
+<ParamField path="--auth-file" type="string">
+  Path to authentication file.
+</ParamField>
+
+```bash
+pixi global add --environment myenv numpy --tls-no-verify
+```
+
+## See Also
+
+- [pixi global install](/commands/global-install) - Install a new global environment
+- [pixi global remove](/commands/global-remove) - Remove dependencies from environment
+- [pixi global expose](/commands/global-expose) - Manage exposed executables
+- [pixi global list](/commands/global-list) - List global environments

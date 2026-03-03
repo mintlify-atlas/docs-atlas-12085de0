@@ -1,0 +1,295 @@
+---
+title: pixi reinstall
+description: Reinstall environments and packages in your pixi workspace
+---
+
+The `pixi reinstall` command reinstalls environments, updating the lockfile if needed and reinstalling packages from scratch.
+
+## Usage
+
+```bash
+pixi reinstall [OPTIONS] [PACKAGE]...
+```
+
+## Arguments
+
+<ParamField path="PACKAGE" type="string">
+  Specific package(s) to reinstall. If not provided, the entire environment is reinstalled.
+  
+  Multiple packages can be specified.
+</ParamField>
+
+```bash
+pixi reinstall numpy pandas
+pixi reinstall python
+```
+
+## Behavior
+
+### Full Environment Reinstall
+
+When no packages are specified, the entire environment is reinstalled:
+
+```bash
+pixi reinstall
+```
+
+This will:
+1. Update the lockfile if it's out of date
+2. Remove all installed packages in the environment
+3. Reinstall all packages from the lockfile
+
+### Selective Package Reinstall
+
+When specific packages are provided, only those packages are reinstalled:
+
+```bash
+pixi reinstall numpy scipy
+```
+
+This reinstalls only the specified packages and their dependencies.
+
+## Options
+
+### Environment Selection
+
+<ParamField path="--environment" type="string">
+  The environment to reinstall. Can be specified multiple times to reinstall multiple environments.
+  
+  Short flag: `-e`
+  
+  Defaults to the `default` environment if not specified.
+</ParamField>
+
+```bash
+pixi reinstall --environment test
+pixi reinstall --environment prod --environment dev
+```
+
+### All Environments
+
+<ParamField path="--all" type="boolean" default="false">
+  Reinstall all environments in the workspace.
+  
+  Short flag: `-a`
+  
+  Conflicts with `--environment`.
+</ParamField>
+
+```bash
+pixi reinstall --all
+```
+
+<Note>
+  Use `--all` to reinstall every environment defined in your workspace in one command.
+</Note>
+
+### Lock File Options
+
+<ParamField path="--frozen" type="boolean" default="false">
+  Reinstall using the existing lock file without updating it.
+  
+  Env: `PIXI_FROZEN`
+</ParamField>
+
+<ParamField path="--locked" type="boolean" default="false">
+  Check if lock file is up-to-date before reinstalling. Abort if not.
+  
+  Env: `PIXI_LOCKED`
+</ParamField>
+
+```bash
+pixi reinstall --frozen
+pixi reinstall --locked
+```
+
+## Examples
+
+### Reinstall Default Environment
+
+```bash
+pixi reinstall
+```
+
+Reinstalls all packages in the default environment.
+
+### Reinstall Specific Environment
+
+```bash
+pixi reinstall --environment ml
+```
+
+Reinstalls all packages in the "ml" environment.
+
+### Reinstall Multiple Environments
+
+```bash
+pixi reinstall --environment dev --environment test
+```
+
+Reinstalls both "dev" and "test" environments.
+
+### Reinstall All Environments
+
+```bash
+pixi reinstall --all
+```
+
+Reinstalls every environment in the workspace.
+
+### Reinstall Specific Packages
+
+```bash
+pixi reinstall numpy pandas matplotlib
+```
+
+Reinstalls only numpy, pandas, and matplotlib (and their dependencies) in the default environment.
+
+### Reinstall Package in Specific Environment
+
+```bash
+pixi reinstall python --environment prod
+```
+
+Reinstalls Python in the "prod" environment.
+
+### Reinstall Without Updating Lock
+
+```bash
+pixi reinstall --frozen
+```
+
+Reinstalls using the exact versions in the current lock file.
+
+## When to Use Reinstall
+
+### Corrupted Environment
+
+If your environment is corrupted or packages are in an inconsistent state:
+
+```bash
+pixi reinstall
+```
+
+### After System Changes
+
+After system updates or when packages aren't behaving correctly:
+
+```bash
+pixi reinstall --environment affected-env
+```
+
+### Testing Clean Installation
+
+To verify that all dependencies install correctly from scratch:
+
+```bash
+pixi reinstall --all
+```
+
+### Package Conflicts
+
+When experiencing package conflicts or import errors:
+
+```bash
+pixi reinstall conflicting-package
+```
+
+## Comparison with Other Commands
+
+### reinstall vs install
+
+- `pixi install`: Installs missing packages, keeps existing ones
+- `pixi reinstall`: Removes and reinstalls packages, ensuring clean state
+
+### reinstall vs update
+
+- `pixi update`: Updates packages to newer versions within constraints
+- `pixi reinstall`: Reinstalls current versions from lockfile
+
+### reinstall vs upgrade
+
+- `pixi upgrade`: Upgrades to latest versions, updating lockfile
+- `pixi reinstall`: Reinstalls without changing versions (unless lockfile is updated)
+
+## Global Options
+
+<ParamField path="--manifest-path" type="string">
+  Path to `pixi.toml`, `pyproject.toml`, or workspace directory.
+  
+  Short flag: `-m`
+</ParamField>
+
+```bash
+pixi reinstall --manifest-path /path/to/project
+```
+
+## Config Options
+
+These options override global configuration:
+
+- `--tls-no-verify`: Disable TLS verification
+- `--auth-file <FILE>`: Path to authentication file
+- `--pypi-keyring-provider <PROVIDER>`: Keyring provider for PyPI
+
+## Troubleshooting
+
+### Environment Not Found
+
+Error: `environment 'xyz' not found`
+
+Solution: Check available environments:
+
+```bash
+pixi list --environments
+pixi reinstall --environment correct-name
+```
+
+### Lock File Out of Date
+
+Error: `lock file is out of date`
+
+Solution: Update the lock file or use `--frozen`:
+
+```bash
+# Update lock file and reinstall
+pixi reinstall
+
+# Or use existing lock file
+pixi reinstall --frozen
+```
+
+### Package Not in Environment
+
+Error: `package 'xyz' not found in environment`
+
+Solution: Verify the package is in the environment:
+
+```bash
+pixi list
+pixi add xyz
+pixi reinstall xyz
+```
+
+## Performance Notes
+
+<Tip>
+  Reinstalling specific packages is faster than reinstalling the entire environment.
+</Tip>
+
+For large environments:
+
+```bash
+# Faster - only reinstalls numpy
+pixi reinstall numpy
+
+# Slower - reinstalls everything
+pixi reinstall
+```
+
+## See Also
+
+- [pixi install](/commands/install) - Install dependencies
+- [pixi update](/commands/update) - Update dependencies
+- [pixi upgrade](/commands/upgrade) - Upgrade dependencies to latest versions
+- [pixi clean](/commands/clean) - Clean up workspace cache

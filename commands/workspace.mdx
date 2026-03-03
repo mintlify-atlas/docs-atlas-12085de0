@@ -1,0 +1,490 @@
+---
+title: pixi workspace
+description: Manage workspace configuration through the command line
+---
+
+The `pixi workspace` command provides subcommands to modify and query workspace configuration directly from the command line without manually editing the manifest file.
+
+## Usage
+
+```bash
+pixi workspace <SUBCOMMAND> [OPTIONS]
+```
+
+## Subcommands
+
+The workspace command includes several subcommands for managing different aspects of your workspace:
+
+- `channel` - Manage workspace channels
+- `description` - Get or set workspace description
+- `environment` - Manage workspace environments
+- `export` - Export workspace to different formats
+- `feature` - Manage workspace features
+- `name` - Get or set workspace name
+- `platform` - Manage workspace platforms
+- `requires-pixi` - Manage pixi version requirements
+- `system-requirements` - Manage system requirements
+- `version` - Manage workspace version
+
+## Channel Management
+
+### Add Channel
+
+Add one or more channels to the workspace:
+
+```bash
+pixi workspace channel add [OPTIONS] <CHANNEL>...
+```
+
+**Options:**
+
+<ParamField path="CHANNEL" type="string" required>
+  Channel name or URL to add. Multiple channels can be specified.
+</ParamField>
+
+<ParamField path="--priority" type="integer">
+  Specify the channel priority (higher values = higher priority).
+</ParamField>
+
+<ParamField path="--prepend" type="boolean" default="false">
+  Add the channel(s) to the beginning of the channels list.
+</ParamField>
+
+<ParamField path="--feature" type="string">
+  Add the channel to a specific feature.
+  
+  Short flag: `-f`
+</ParamField>
+
+<ParamField path="--no-install" type="boolean" default="false">
+  Don't install the environment, only update the lock file.
+</ParamField>
+
+**Examples:**
+
+```bash
+pixi workspace channel add conda-forge
+pixi workspace channel add bioconda --prepend
+pixi workspace channel add pytorch --priority 100
+pixi workspace channel add nvidia --feature cuda
+```
+
+**Aliases:** `pixi workspace channel a`
+
+### List Channels
+
+List all channels in the workspace:
+
+```bash
+pixi workspace channel list [OPTIONS]
+```
+
+**Options:**
+
+<ParamField path="--urls" type="boolean" default="false">
+  Display channel URLs instead of names.
+</ParamField>
+
+**Examples:**
+
+```bash
+pixi workspace channel list
+pixi workspace channel list --urls
+```
+
+**Aliases:** `pixi workspace channel ls`
+
+### Remove Channel
+
+Remove one or more channels from the workspace:
+
+```bash
+pixi workspace channel remove [OPTIONS] <CHANNEL>...
+```
+
+**Options:**
+
+<ParamField path="CHANNEL" type="string" required>
+  Channel name or URL to remove. Multiple channels can be specified.
+</ParamField>
+
+<ParamField path="--priority" type="integer">
+  Only remove channels with this priority.
+</ParamField>
+
+<ParamField path="--feature" type="string">
+  Remove the channel from a specific feature.
+  
+  Short flag: `-f`
+</ParamField>
+
+<ParamField path="--no-install" type="boolean" default="false">
+  Don't install the environment, only update the lock file.
+</ParamField>
+
+**Examples:**
+
+```bash
+pixi workspace channel remove defaults
+pixi workspace channel remove pytorch --feature ml
+```
+
+**Aliases:** `pixi workspace channel rm`
+
+## Description Management
+
+### Get Description
+
+Get the workspace description:
+
+```bash
+pixi workspace description get
+```
+
+Outputs the current workspace description if set.
+
+### Set Description
+
+Set the workspace description:
+
+```bash
+pixi workspace description set <DESCRIPTION>
+```
+
+**Examples:**
+
+```bash
+pixi workspace description get
+pixi workspace description set "My awesome data science project"
+```
+
+## Environment Management
+
+### Add Environment
+
+Add a new environment to the workspace:
+
+```bash
+pixi workspace environment add [OPTIONS] <NAME>
+```
+
+**Options:**
+
+<ParamField path="NAME" type="string" required>
+  Name of the environment to add.
+</ParamField>
+
+<ParamField path="--feature" type="string">
+  Features to add to the environment. Can be specified multiple times.
+  
+  Short flag: `-f`
+</ParamField>
+
+<ParamField path="--solve-group" type="string">
+  The solve-group to add the environment to.
+</ParamField>
+
+<ParamField path="--no-default-feature" type="boolean" default="false">
+  Don't include the default feature in the environment.
+</ParamField>
+
+<ParamField path="--force" type="boolean" default="false">
+  Update the manifest even if the environment already exists.
+</ParamField>
+
+**Examples:**
+
+```bash
+pixi workspace environment add prod
+pixi workspace environment add test --feature test-deps
+pixi workspace environment add ml --feature ml --feature cuda --solve-group gpu
+pixi workspace environment add minimal --no-default-feature
+```
+
+**Aliases:** `pixi workspace environment a`
+
+### List Environments
+
+List all environments in the workspace:
+
+```bash
+pixi workspace environment list
+```
+
+Displays all environments with their features and solve groups.
+
+**Aliases:** `pixi workspace environment ls`
+
+### Remove Environment
+
+Remove an environment from the workspace:
+
+```bash
+pixi workspace environment remove <NAME>
+```
+
+**Examples:**
+
+```bash
+pixi workspace environment list
+pixi workspace environment remove old-env
+```
+
+**Aliases:** `pixi workspace environment rm`
+
+## Feature Management
+
+### List Features
+
+List all features in the workspace:
+
+```bash
+pixi workspace feature list
+```
+
+Displays features with their dependencies, PyPI dependencies, and tasks.
+
+**Aliases:** `pixi workspace feature ls`
+
+### Remove Feature
+
+Remove a feature from the workspace:
+
+```bash
+pixi workspace feature remove <FEATURE>
+```
+
+**Examples:**
+
+```bash
+pixi workspace feature list
+pixi workspace feature remove old-feature
+```
+
+**Aliases:** `pixi workspace feature rm`
+
+## Name Management
+
+### Get Name
+
+Get the workspace name:
+
+```bash
+pixi workspace name get
+```
+
+### Set Name
+
+Set the workspace name:
+
+```bash
+pixi workspace name set <NAME>
+```
+
+<Note>
+  Workspace names should only use lowercase letters (a-z), digits (0-9), hyphens (-), and underscores (_).
+</Note>
+
+**Examples:**
+
+```bash
+pixi workspace name get
+pixi workspace name set "my-project"
+pixi workspace name set "data_analysis_2024"
+```
+
+## Platform Management
+
+### Add Platform
+
+Add platform(s) to the workspace:
+
+```bash
+pixi workspace platform add [OPTIONS] <PLATFORM>...
+```
+
+**Options:**
+
+<ParamField path="PLATFORM" type="string" required>
+  Platform name(s) to add (e.g., linux-64, osx-arm64, win-64).
+</ParamField>
+
+<ParamField path="--no-install" type="boolean" default="false">
+  Don't update the environment, only add to lock file.
+</ParamField>
+
+<ParamField path="--feature" type="string">
+  Add the platform to a specific feature.
+  
+  Short flag: `-f`
+</ParamField>
+
+**Examples:**
+
+```bash
+pixi workspace platform add linux-64
+pixi workspace platform add osx-arm64 win-64
+pixi workspace platform add linux-64 --feature cuda --no-install
+```
+
+**Aliases:** `pixi workspace platform a`
+
+### List Platforms
+
+List all platforms in the workspace:
+
+```bash
+pixi workspace platform list
+```
+
+**Aliases:** `pixi workspace platform ls`
+
+### Remove Platform
+
+Remove platform(s) from the workspace:
+
+```bash
+pixi workspace platform remove [OPTIONS] <PLATFORM>...
+```
+
+**Options:**
+
+<ParamField path="PLATFORM" type="string" required>
+  Platform name(s) to remove.
+</ParamField>
+
+<ParamField path="--no-install" type="boolean" default="false">
+  Don't update the environment, only remove from lock file.
+</ParamField>
+
+<ParamField path="--feature" type="string">
+  Remove the platform from a specific feature.
+  
+  Short flag: `-f`
+</ParamField>
+
+**Examples:**
+
+```bash
+pixi workspace platform remove osx-64
+pixi workspace platform remove linux-64 --feature old-feature
+```
+
+**Aliases:** `pixi workspace platform rm`
+
+## Export
+
+Export workspace to different formats:
+
+```bash
+pixi workspace export <SUBCOMMAND>
+```
+
+See the export subcommands for available formats (e.g., conda environment files).
+
+## Requires Pixi
+
+Manage pixi version requirements for the workspace:
+
+```bash
+pixi workspace requires-pixi <SUBCOMMAND>
+```
+
+Available subcommands:
+- `get` - Get the required pixi version
+- `set` - Set the required pixi version
+- `unset` - Remove the pixi version requirement
+- `verify` - Verify current pixi version meets requirements
+
+## System Requirements
+
+Manage system requirements for the workspace:
+
+```bash
+pixi workspace system-requirements <SUBCOMMAND>
+```
+
+Available subcommands:
+- `add` - Add system requirements
+- `list` - List system requirements
+
+## Version Management
+
+Manage workspace version:
+
+```bash
+pixi workspace version <SUBCOMMAND>
+```
+
+Available subcommands:
+- `get` - Get the workspace version
+- `set` - Set the workspace version
+- `bump` - Bump the workspace version
+
+## Global Options
+
+<ParamField path="--manifest-path" type="string">
+  Path to `pixi.toml`, `pyproject.toml`, or workspace directory.
+  
+  Short flag: `-m`
+</ParamField>
+
+```bash
+pixi workspace channel list --manifest-path /path/to/project
+```
+
+## Complete Examples
+
+### Set Up New Workspace
+
+```bash
+# Set workspace metadata
+pixi workspace name set "ml-project"
+pixi workspace description set "Machine learning project with GPU support"
+pixi workspace version set "0.1.0"
+
+# Add platforms
+pixi workspace platform add linux-64 osx-arm64
+
+# Add channels
+pixi workspace channel add conda-forge --prepend
+pixi workspace channel add pytorch
+
+# Create environments
+pixi workspace environment add prod --feature ml --feature data
+pixi workspace environment add dev --feature ml --feature test
+```
+
+### Manage Multi-Environment Project
+
+```bash
+# Add test environment with specific features
+pixi workspace environment add test --feature testing --no-default-feature
+
+# Add channels for the test feature
+pixi workspace channel add conda-forge --feature testing
+
+# Add platform for testing
+pixi workspace platform add linux-64 --feature testing
+```
+
+### Inspect Workspace Configuration
+
+```bash
+# View workspace metadata
+pixi workspace name get
+pixi workspace description get
+pixi workspace version get
+
+# List configurations
+pixi workspace channel list
+pixi workspace platform list
+pixi workspace environment list
+pixi workspace feature list
+```
+
+## See Also
+
+- [pixi init](/commands/init) - Initialize a new pixi workspace
+- [pixi add](/commands/add) - Add dependencies to workspace
+- [pixi remove](/commands/remove) - Remove dependencies from workspace

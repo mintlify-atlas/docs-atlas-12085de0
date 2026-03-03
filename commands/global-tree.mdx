@@ -1,0 +1,420 @@
+---
+title: pixi global tree
+description: Show dependency tree for a global environment
+---
+
+The `pixi global tree` command displays the dependency tree for a specific global environment, showing how packages depend on each other.
+
+## Usage
+
+```bash
+pixi global tree [OPTIONS] --environment <ENVIRONMENT>
+```
+
+## Options
+
+### Environment Selection
+
+<ParamField path="--environment" type="string" required>
+  The environment to list packages for.
+  
+  Short flag: `-e`
+</ParamField>
+
+```bash
+pixi global tree --environment python311
+pixi global tree -e tools
+```
+
+### Filtering
+
+<ParamField path="REGEX" type="string">
+  List only packages matching a regular expression.
+  
+  Positional argument (optional).
+</ParamField>
+
+```bash
+pixi global tree --environment python311 "^numpy"
+pixi global tree -e tools "ruff.*"
+```
+
+### Inverted Tree
+
+<ParamField path="--invert" type="boolean" default="false">
+  Invert tree and show what depends on a given package.
+  
+  Short flag: `-i`
+  
+  Requires a regex argument to specify the package.
+</ParamField>
+
+```bash
+pixi global tree --environment python311 numpy --invert
+pixi global tree -e tools -i pytest
+```
+
+## Behavior
+
+### Standard Tree View
+
+Shows packages and their dependencies in a tree structure:
+
+```bash
+pixi global tree --environment python311
+```
+
+Example output:
+
+```text
+python 3.11.8
+├── openssl 3.2.0
+│   └── ca-certificates 2024.2.2
+└── readline 8.2
+    └── ncurses 6.4
+
+numpy 1.26.4
+├── python 3.11.8
+│   ├── openssl 3.2.0
+│   │   └── ca-certificates 2024.2.2
+│   └── readline 8.2
+│       └── ncurses 6.4
+└── libblas 3.9.0
+```
+
+### Direct Dependencies Highlighted
+
+Packages directly specified in the manifest are highlighted in **green**.
+
+<Note>
+  Direct dependencies (specified in your manifest) are highlighted in green to distinguish them from transitive dependencies.
+</Note>
+
+### Inverted Tree View
+
+Shows what depends on a specific package:
+
+```bash
+pixi global tree --environment python311 numpy --invert
+```
+
+Example output:
+
+```text
+numpy 1.26.4
+└── pandas 2.2.0
+    └── matplotlib 3.8.2
+```
+
+This shows that pandas depends on numpy, and matplotlib depends on pandas.
+
+## Examples
+
+### Show Full Dependency Tree
+
+```bash
+pixi global tree --environment python311
+```
+
+Displays all packages and their dependencies.
+
+### Filter by Package Name
+
+```bash
+pixi global tree --environment python311 numpy
+```
+
+Shows only numpy and its dependencies.
+
+### Filter with Regex
+
+```bash
+pixi global tree --environment python311 "^py.*"
+```
+
+Shows packages starting with "py" (python, pytz, etc.).
+
+### Show Reverse Dependencies
+
+```bash
+pixi global tree --environment python311 python --invert
+```
+
+Shows all packages that depend on Python.
+
+### Check What Depends on a Library
+
+```bash
+pixi global tree --environment tools certifi --invert
+```
+
+Shows which packages in your tools environment depend on certifi.
+
+### Find Dependency Chain
+
+```bash
+pixi global tree --environment python311 openssl
+```
+
+Shows how openssl is used in the dependency tree.
+
+## Understanding the Output
+
+### Tree Structure Symbols
+
+- `├──` - Branch connector (more dependencies follow)
+- `└──` - Last branch connector (final dependency)
+- `│` - Vertical line (continuation)
+
+### Package Information
+
+Each line shows:
+- Package name
+- Version number
+- Color coding:
+  - **Green**: Direct dependencies (in your manifest)
+  - Default: Transitive dependencies (pulled in by other packages)
+
+### Virtual Packages
+
+Packages starting with `__` are filtered out (e.g., `__glibc`, `__cuda`):
+
+```text
+# These don't appear in tree:
+__glibc 2.35
+__unix 0
+```
+
+## Common Use Cases
+
+### Debug Dependency Issues
+
+Find why a package is installed:
+
+```bash
+pixi global tree --environment myenv unexpected-package --invert
+```
+
+Shows what pulled in the unexpected package.
+
+### Check Python Dependencies
+
+```bash
+pixi global tree --environment python311 python --invert
+```
+
+See all packages that require Python.
+
+### Find Heavy Dependencies
+
+```bash
+pixi global tree --environment ml-env
+```
+
+Identify packages with many dependencies.
+
+### Verify Environment Contents
+
+```bash
+pixi global tree --environment tools
+```
+
+Ensure the environment contains expected packages.
+
+### Analyze Package Relationships
+
+```bash
+pixi global tree --environment data scipy
+```
+
+See scipy's full dependency tree.
+
+## Filtering Examples
+
+### Python-Related Packages
+
+```bash
+pixi global tree --environment myenv "^py"
+```
+
+Matches: python, pytz, pyyaml, etc.
+
+### Library Dependencies
+
+```bash
+pixi global tree --environment myenv "lib.*"
+```
+
+Matches: libblas, libcblas, libgfortran, etc.
+
+### Specific Version
+
+```bash
+pixi global tree --environment myenv "numpy.*1\.26"
+```
+
+Matches: numpy 1.26.x
+
+### Case-Insensitive Match
+
+```bash
+pixi global tree --environment myenv "(?i)NUMPY"
+```
+
+Matches numpy regardless of case in the pattern.
+
+## Inverted Tree Examples
+
+### What Depends on OpenSSL
+
+```bash
+pixi global tree --environment python311 openssl --invert
+```
+
+Shows the reverse dependency chain.
+
+### What Uses NumPy
+
+```bash
+pixi global tree --environment data-science numpy --invert
+```
+
+Shows all packages that depend on NumPy.
+
+### Find Python Dependents
+
+```bash
+pixi global tree --environment myenv python --invert
+```
+
+Lists everything that requires Python.
+
+## Troubleshooting
+
+### Environment Not Found
+
+Error: `Environment not found`
+
+Solution: Check environment name:
+
+```bash
+pixi global list
+pixi global tree --environment correct-name
+```
+
+### No Packages Found
+
+Error: `No packages found matching pattern`
+
+Solution: Adjust regex pattern:
+
+```bash
+# Too specific
+pixi global tree --environment myenv "numpy==1.26.4"
+
+# Better
+pixi global tree --environment myenv "numpy"
+```
+
+### Invert Requires Regex
+
+Error: `--invert requires regex argument`
+
+Solution: Provide package name:
+
+```bash
+pixi global tree --environment myenv --invert  # ❌ Wrong
+pixi global tree --environment myenv numpy --invert  # ✅ Correct
+```
+
+### Empty Tree
+
+If tree is empty, environment may not be installed:
+
+```bash
+pixi global sync
+pixi global tree --environment myenv
+```
+
+## Comparison with Project Tree
+
+### Global Tree vs Project Tree
+
+- `pixi global tree`: Shows dependencies for global environments
+- `pixi tree`: Shows dependencies for workspace project
+
+```bash
+# Global environment
+pixi global tree --environment python311
+
+# Workspace project
+pixi tree
+```
+
+## Output Formats
+
+The tree output is designed for terminal viewing:
+
+- Color highlighting for direct dependencies
+- Unicode tree characters for structure
+- Package versions clearly displayed
+
+### Redirect to File
+
+```bash
+pixi global tree --environment myenv > tree.txt
+```
+
+Note: Color codes may appear in the file. Use `--no-color` if available or process the output.
+
+## Performance Notes
+
+<Tip>
+  For large environments, filtering with regex improves performance and readability.
+</Tip>
+
+```bash
+# Faster - shows only relevant packages
+pixi global tree --environment large-env numpy
+
+# Slower - shows entire tree
+pixi global tree --environment large-env
+```
+
+## Advanced Usage
+
+### Combine with Other Tools
+
+```bash
+# Count dependencies
+pixi global tree --environment myenv | wc -l
+
+# Search for specific package
+pixi global tree --environment myenv | grep openssl
+
+# Save tree structure
+pixi global tree --environment myenv > deps-$(date +%Y%m%d).txt
+```
+
+### Audit Dependencies
+
+```bash
+# Check for security concerns
+pixi global tree --environment prod openssl --invert
+pixi global tree --environment prod certifi --invert
+```
+
+### Compare Environments
+
+```bash
+pixi global tree --environment env1 > env1-tree.txt
+pixi global tree --environment env2 > env2-tree.txt
+diff env1-tree.txt env2-tree.txt
+```
+
+## See Also
+
+- [pixi tree](/commands/tree) - Show dependency tree for workspace project
+- [pixi global list](/commands/global-list) - List packages in global environments
+- [pixi global install](/commands/global-install) - Install global environment
+- [pixi list](/commands/list) - List packages in workspace

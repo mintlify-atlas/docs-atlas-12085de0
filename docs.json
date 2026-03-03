@@ -107,8 +107,12 @@
               "commands/add",
               "commands/remove",
               "commands/install",
+              "commands/reinstall",
+              "commands/lock",
               "commands/update",
-              "commands/upgrade"
+              "commands/upgrade",
+              "commands/import",
+              "commands/workspace"
             ]
           },
           {
@@ -127,10 +131,17 @@
             "group": "Global Commands",
             "pages": [
               "commands/global-install",
+              "commands/global-add",
               "commands/global-remove",
+              "commands/global-uninstall",
               "commands/global-list",
+              "commands/global-expose",
+              "commands/global-update",
               "commands/global-upgrade",
-              "commands/global-sync"
+              "commands/global-upgrade-all",
+              "commands/global-sync",
+              "commands/global-tree",
+              "commands/global-edit"
             ]
           },
           {
@@ -148,7 +159,8 @@
               "commands/clean",
               "commands/auth",
               "commands/config",
-              "commands/completion"
+              "commands/completion",
+              "commands/self-update"
             ]
           }
         ]

@@ -1,0 +1,375 @@
+---
+title: pixi global edit
+description: Edit the global manifest file in your default editor
+---
+
+The `pixi global edit` command opens the global manifest file in your default text editor for manual editing.
+
+## Usage
+
+```bash
+pixi global edit [OPTIONS]
+```
+
+## Options
+
+<ParamField path="--editor" type="string">
+  The editor to use. Defaults to the `EDITOR` environment variable.
+  
+  Default editors by platform:
+  - **Unix/macOS**: `nano`
+  - **Windows**: `notepad`
+</ParamField>
+
+```bash
+pixi global edit
+pixi global edit --editor vim
+pixi global edit --editor code
+pixi global edit --editor "code --wait"
+```
+
+## Behavior
+
+### Editor Selection
+
+The command determines which editor to use in this order:
+
+1. `--editor` flag (if provided)
+2. `EDITOR` environment variable
+3. Platform default:
+   - Unix/macOS: `nano`
+   - Windows: `notepad`
+
+### File Location
+
+The global manifest file is located at:
+
+- **Unix/macOS**: `~/.pixi/manifests/pixi-global.toml`
+- **Windows**: `%USERPROFILE%\.pixi\manifests\pixi-global.toml`
+
+### Directory Creation
+
+If the manifest directory doesn't exist, it's automatically created before opening the editor.
+
+## Examples
+
+### Edit with Default Editor
+
+```bash
+pixi global edit
+```
+
+Opens the global manifest in your default editor (from `$EDITOR` or platform default).
+
+### Edit with Specific Editor
+
+```bash
+pixi global edit --editor vim
+pixi global edit --editor emacs
+pixi global edit --editor nano
+```
+
+### Edit with Visual Editor
+
+```bash
+pixi global edit --editor code
+pixi global edit --editor "code --wait"
+pixi global edit --editor subl
+```
+
+<Note>
+  For GUI editors like VS Code, use `--wait` flag to make the terminal wait until you close the file.
+</Note>
+
+### Edit with Environment Variable
+
+```bash
+export EDITOR=vim
+pixi global edit
+```
+
+Sets your preferred editor and opens the manifest.
+
+## Global Manifest Structure
+
+The global manifest file has the following structure:
+
+```toml
+version = 1
+
+[envs.python311]
+channels = ["conda-forge"]
+[envs.python311.dependencies]
+python = "3.11.*"
+numpy = ">=1.20"
+
+[envs.python311.exposed]
+python3 = "python"
+pip3 = "pip"
+
+[envs.tools]
+channels = ["conda-forge"]
+[envs.tools.dependencies]
+ruff = "*"
+black = "*"
+
+[envs.tools.exposed]
+ruff = "ruff"
+black = "black"
+```
+
+## Manual Editing Use Cases
+
+### Bulk Environment Changes
+
+Manually edit multiple environments at once:
+
+```toml
+[envs.python311.dependencies]
+python = "3.11.*"
+numpy = ">=1.20,<2.0"
+pandas = ">=2.0"
+```
+
+### Complex Exposure Mappings
+
+Set up multiple executable mappings:
+
+```toml
+[envs.python311.exposed]
+python = "python"
+python3 = "python"
+python3.11 = "python"
+pip = "pip"
+pip3 = "pip"
+```
+
+### Channel Configuration
+
+Configure custom channels for environments:
+
+```toml
+[envs.pytorch]
+channels = ["pytorch", "nvidia", "conda-forge"]
+[envs.pytorch.dependencies]
+pytorch = "*"
+torchvision = "*"
+cudatoolkit = "11.8.*"
+```
+
+### Version Pinning
+
+Pin specific versions across environments:
+
+```toml
+[envs.tools]
+channels = ["conda-forge"]
+[envs.tools.dependencies]
+ruff = "==0.1.9"
+black = "==24.1.0"
+mypy = "==1.8.0"
+```
+
+## Editing Best Practices
+
+<Tip>
+  After manually editing the global manifest:
+  
+  1. Save and close the file
+  2. Run `pixi global sync` to apply changes
+  3. Verify with `pixi global list`
+</Tip>
+
+### Validate Before Saving
+
+Ensure TOML syntax is correct:
+
+```toml
+# ✅ Correct
+[envs.myenv.dependencies]
+python = "3.11.*"
+
+# ❌ Incorrect (missing quotes)
+[envs.myenv.dependencies]
+python = 3.11
+```
+
+### Backup Before Major Changes
+
+```bash
+cp ~/.pixi/manifests/pixi-global.toml ~/.pixi/manifests/pixi-global.toml.backup
+pixi global edit
+```
+
+## Common Editing Tasks
+
+### Add New Environment
+
+```toml
+[envs.newenv]
+channels = ["conda-forge"]
+[envs.newenv.dependencies]
+package1 = "*"
+package2 = ">=1.0"
+
+[envs.newenv.exposed]
+tool = "tool"
+```
+
+Then sync:
+
+```bash
+pixi global sync
+```
+
+### Remove Environment
+
+Delete the entire environment section:
+
+```toml
+# Delete this section
+[envs.oldenv]
+# ...
+```
+
+Then sync:
+
+```bash
+pixi global sync
+```
+
+### Update Dependencies
+
+Change version constraints:
+
+```toml
+[envs.python311.dependencies]
+python = "3.11.*"  # Change to 3.12.*
+numpy = ">=1.20"   # Change to >=1.26
+```
+
+### Modify Exposures
+
+Add, remove, or change exposed executables:
+
+```toml
+[envs.python311.exposed]
+python = "python"      # Keep
+python3 = "python"     # Keep
+python3.11 = "python"  # Add this
+# Remove python2 exposure
+```
+
+## Editor-Specific Tips
+
+### Vim/Neovim
+
+```bash
+export EDITOR=vim
+pixi global edit
+
+# Or with specific settings
+pixi global edit --editor "vim +set ft=toml"
+```
+
+### Visual Studio Code
+
+```bash
+pixi global edit --editor "code --wait"
+```
+
+The `--wait` flag ensures the terminal waits for you to close the file.
+
+### Nano
+
+```bash
+pixi global edit --editor nano
+```
+
+Nano is the default on Unix systems.
+
+### Emacs
+
+```bash
+export EDITOR=emacs
+pixi global edit
+```
+
+## Troubleshooting
+
+### Editor Not Found
+
+Error: `editor not found` or `command not found`
+
+Solution: Use full path or available editor:
+
+```bash
+pixi global edit --editor /usr/bin/vim
+pixi global edit --editor nano
+```
+
+### File Not Created
+
+If the file doesn't exist, the directory is created automatically. The file is created when you save in the editor.
+
+### Syntax Errors After Editing
+
+Error: `failed to parse manifest`
+
+Solution: Validate TOML syntax:
+
+```bash
+# Check for common issues:
+# - Missing quotes around strings
+# - Incorrect indentation
+# - Duplicate keys
+
+# Restore from backup if needed
+cp ~/.pixi/manifests/pixi-global.toml.backup ~/.pixi/manifests/pixi-global.toml
+```
+
+### Changes Not Applied
+
+After editing, run sync to apply changes:
+
+```bash
+pixi global edit
+# Make changes and save
+pixi global sync
+pixi global list  # Verify changes
+```
+
+## Platform Differences
+
+### Unix/macOS
+
+Default editor: `nano`
+
+Manifest location: `~/.pixi/manifests/pixi-global.toml`
+
+```bash
+pixi global edit  # Opens in nano
+```
+
+### Windows
+
+Default editor: `notepad`
+
+Manifest location: `%USERPROFILE%\.pixi\manifests\pixi-global.toml`
+
+```bash
+pixi global edit  # Opens in notepad
+```
+
+Windows command wrapping:
+
+```bash
+pixi global edit --editor notepad
+pixi global edit --editor code
+```
+
+## See Also
+
+- [pixi global sync](/commands/global-sync) - Synchronize global environments
+- [pixi global list](/commands/global-list) - List global environments
+- [pixi global install](/commands/global-install) - Install global environments

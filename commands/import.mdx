@@ -1,0 +1,329 @@
+---
+title: pixi import
+description: Import dependencies from environment files into your pixi workspace
+---
+
+The `pixi import` command imports dependencies from external environment files (conda environment.yml or requirements.txt) into your pixi workspace.
+
+## Usage
+
+```bash
+pixi import [OPTIONS] <FILE>
+```
+
+## Arguments
+
+<ParamField path="FILE" type="string" required>
+  Path to the environment file to import. Supported formats:
+  - `environment.yml` or `environment.yaml` (conda environment file)
+  - `requirements.txt` (PyPI requirements file)
+  
+  If `--format` is not specified, pixi will try to detect the format automatically.
+</ParamField>
+
+## Options
+
+### Format Selection
+
+<ParamField path="--format" type="string">
+  Explicitly specify the file format to interpret. Options:
+  - `conda-env` - Conda environment file (environment.yml)
+  - `pypi-txt` - PyPI requirements file (requirements.txt)
+  
+  Case-insensitive.
+</ParamField>
+
+```bash
+pixi import environment.yml --format conda-env
+pixi import requirements.txt --format pypi-txt
+```
+
+### Platform Configuration
+
+<ParamField path="--platform" type="Platform">
+  Specify platforms for the imported environment. Can be specified multiple times.
+  
+  Short flag: `-p`
+</ParamField>
+
+```bash
+pixi import environment.yml --platform linux-64 --platform osx-arm64
+```
+
+### Environment and Feature Names
+
+<ParamField path="--environment" type="string">
+  Name for the created environment.
+  
+  Short flag: `-e`
+  
+  If not provided, attempts to use the `name` field from conda environment files. For PyPI files, this is required.
+</ParamField>
+
+<ParamField path="--feature" type="string">
+  Name for the created feature.
+  
+  Short flag: `-f`
+  
+  If not provided, uses the same value as `--environment`.
+</ParamField>
+
+```bash
+pixi import environment.yml --environment ml-env --feature ml
+pixi import requirements.txt --environment test --feature testing
+```
+
+## Import Formats
+
+### Conda Environment Files
+
+<Note>
+  When importing conda environment files, pixi extracts:
+  - Dependencies (both conda and pip)
+  - Channels
+  - Environment name (if specified)
+</Note>
+
+Example `environment.yml`:
+
+```yaml
+name: myenv
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy>=1.20
+  - pip:
+    - requests
+    - flask
+```
+
+Import command:
+
+```bash
+pixi import environment.yml
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[feature.myenv.dependencies]
+python = "3.11.*"
+numpy = ">=1.20"
+
+[feature.myenv.pypi-dependencies]
+requests = "*"
+flask = "*"
+
+[environments]
+myenv = ["myenv"]
+```
+
+### PyPI Requirements Files
+
+<Warning>
+  Unnamed requirements (direct URLs without package names) are currently unsupported.
+  Constraints in requirements files are ignored with a warning.
+</Warning>
+
+Example `requirements.txt`:
+
+```text
+requests==2.28.0
+flask>=2.0,<3.0
+django
+```
+
+Import command:
+
+```bash
+pixi import requirements.txt --environment web
+```
+
+Resulting `pixi.toml`:
+
+```toml
+[feature.web.pypi-dependencies]
+requests = "==2.28.0"
+flask = ">=2.0,<3.0"
+django = "*"
+
+[environments]
+web = ["web"]
+```
+
+## Behavior
+
+### Automatic Format Detection
+
+If `--format` is not specified, pixi tries each supported format in order:
+1. Conda environment format
+2. PyPI requirements format
+
+If all formats fail, an error is returned:
+
+```bash
+pixi import unknown-file.txt
+# Error: Tried all formats for input file, but none were successful.
+#        Pass a `format` argument to see the specific error for that format.
+```
+
+### Environment Creation
+
+- **New environment**: Creates a new environment with the specified name and feature
+- **Existing environment**: Adds the feature to the existing environment if not already present
+- **Feature addition**: If the environment exists but doesn't include the feature, the feature is added to it
+
+### Platform Handling
+
+If platforms are specified with `--platform`, they are added to the feature:
+
+```bash
+pixi import environment.yml --platform linux-64 --platform osx-64
+```
+
+This adds the platforms to the feature's platform list.
+
+## Examples
+
+### Import Conda Environment
+
+```bash
+pixi import environment.yml
+```
+
+Uses the `name` field from environment.yml:
+
+```yaml
+name: data-science
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pandas
+  - numpy
+```
+
+### Import with Custom Names
+
+```bash
+pixi import environment.yml --environment ml --feature machine-learning
+```
+
+Creates an environment named "ml" with a feature named "machine-learning".
+
+### Import PyPI Requirements
+
+```bash
+pixi import requirements.txt --environment backend --feature api
+```
+
+PyPI files require explicit `--environment` or `--feature` specification.
+
+### Import with Platforms
+
+```bash
+pixi import environment.yml --platform linux-64 --platform osx-arm64
+```
+
+Imports dependencies and configures them for specific platforms.
+
+### Import with Explicit Format
+
+```bash
+pixi import deps.txt --format pypi-txt --environment deps
+```
+
+Forces interpretation as a PyPI requirements file.
+
+### Import to Existing Environment
+
+```bash
+# First import
+pixi import base.yml --environment prod
+
+# Add more dependencies to the same environment
+pixi import additional.yml --environment prod --feature extras
+```
+
+The feature "extras" is added to the existing "prod" environment.
+
+## Global Options
+
+<ParamField path="--manifest-path" type="string">
+  Path to `pixi.toml`, `pyproject.toml`, or workspace directory.
+  
+  Short flag: `-m`
+</ParamField>
+
+```bash
+pixi import environment.yml --manifest-path /path/to/project
+```
+
+## Config Options
+
+These options override global configuration:
+
+- `--tls-no-verify`: Disable TLS verification
+- `--auth-file <FILE>`: Path to authentication file
+- `--pypi-keyring-provider <PROVIDER>`: Keyring provider for PyPI
+
+## Troubleshooting
+
+### Missing Environment Name
+
+Error: `Missing name: provide --feature or --environment, or set 'name:' in input file`
+
+Solution: Specify the environment/feature name explicitly:
+
+```bash
+pixi import environment.yml --environment myenv
+```
+
+Or ensure the conda environment file has a `name` field.
+
+### Unsupported Format
+
+Error: `Tried all formats for input file, but none were successful`
+
+Solution: Specify the format explicitly:
+
+```bash
+pixi import file.txt --format pypi-txt
+```
+
+### Unnamed Requirements
+
+Error: `Error parsing input file: unnamed requirements are currently unsupported`
+
+Solution: Ensure all requirements in requirements.txt have package names:
+
+```text
+# ❌ Unsupported
+https://github.com/user/repo/archive/main.zip
+
+# ✅ Supported
+mypackage @ https://github.com/user/repo/archive/main.zip
+```
+
+### Constraints Ignored
+
+Warning: `Constraints detected in input file, but these are currently unsupported`
+
+Constraints (lines starting with `-c` in requirements.txt) are not yet supported and will be ignored.
+
+## Limitations
+
+<Warning>
+  Current limitations:
+  - Unnamed requirements are not supported
+  - Constraints files (`-c constraints.txt`) are ignored
+  - Environment variables from conda files are not imported
+</Warning>
+
+## See Also
+
+- [pixi add](/commands/add) - Add dependencies to your workspace
+- [pixi init](/commands/init) - Initialize a new pixi workspace
+- [pixi install](/commands/install) - Install workspace dependencies
