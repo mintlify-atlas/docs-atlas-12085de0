@@ -1,0 +1,202 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Pixi",
+  "projectDescription": "Cross-platform package manager and workflow tool built on the conda ecosystem",
+  "theme": "aspen",
+  "primaryColor": "#3B82F6",
+  "lightColor": "#60A5FA",
+  "darkColor": "#2563EB",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/environments",
+              "concepts/tasks",
+              "concepts/lockfile",
+              "concepts/multi-platform",
+              "concepts/multi-environment",
+              "concepts/system-requirements",
+              "concepts/package-specifications",
+              "concepts/conda-pypi"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "tutorials/python",
+              "tutorials/pyproject-toml",
+              "tutorials/global-tools",
+              "tutorials/multi-environment",
+              "tutorials/import-environments"
+            ]
+          },
+          {
+            "group": "Building Packages",
+            "pages": [
+              "build/getting-started",
+              "build/python-package",
+              "build/cpp-package",
+              "build/workspace",
+              "build/variants",
+              "build/dependency-types",
+              "build/backends",
+              "build/package-source"
+            ]
+          },
+          {
+            "group": "Distribution",
+            "pages": [
+              "deployment/pixi-pack",
+              "deployment/authentication",
+              "deployment/container",
+              "deployment/s3"
+            ]
+          },
+          {
+            "group": "Integration",
+            "pages": [
+              "integration/github-actions",
+              "integration/vscode",
+              "integration/jupyterlab",
+              "integration/extensions"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/configuration",
+              "advanced/authentication-settings",
+              "advanced/pypi-resolution",
+              "advanced/channel-priorities",
+              "advanced/environment-activation"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Command Reference",
+        "groups": [
+          {
+            "group": "Workspace Commands",
+            "pages": [
+              "commands/init",
+              "commands/add",
+              "commands/remove",
+              "commands/install",
+              "commands/update",
+              "commands/upgrade"
+            ]
+          },
+          {
+            "group": "Environment Commands",
+            "pages": [
+              "commands/run",
+              "commands/shell",
+              "commands/shell-hook",
+              "commands/exec",
+              "commands/task",
+              "commands/list",
+              "commands/tree"
+            ]
+          },
+          {
+            "group": "Global Commands",
+            "pages": [
+              "commands/global-install",
+              "commands/global-remove",
+              "commands/global-list",
+              "commands/global-upgrade",
+              "commands/global-sync"
+            ]
+          },
+          {
+            "group": "Build Commands",
+            "pages": [
+              "commands/build",
+              "commands/upload"
+            ]
+          },
+          {
+            "group": "Other Commands",
+            "pages": [
+              "commands/search",
+              "commands/info",
+              "commands/clean",
+              "commands/auth",
+              "commands/config",
+              "commands/completion"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Configuration",
+        "groups": [
+          {
+            "group": "Manifest Files",
+            "pages": [
+              "reference/pixi-toml",
+              "reference/pyproject-toml",
+              "reference/pixi-lock"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "reference/configuration",
+              "reference/environment-variables",
+              "reference/cli-options"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Cross-platform package management (Linux, macOS, Windows)",
+    "Conda and PyPI ecosystem integration",
+    "Reproducible environments with lockfiles",
+    "Task runner and workflow management",
+    "Global tool installation (pipx alternative)",
+    "Multi-environment workspace support",
+    "Python pyproject.toml support",
+    "Package building and distribution",
+    "Fast parallel dependency resolution",
+    "Disk-efficient through hard links and reflinks"
+  ],
+  "publicApiSurface": [
+    "pixi init",
+    "pixi add",
+    "pixi install",
+    "pixi run",
+    "pixi shell",
+    "pixi task",
+    "pixi global install",
+    "pixi build",
+    "pixi update",
+    "pixi upgrade",
+    "pixi remove",
+    "pixi exec",
+    "pixi list",
+    "pixi tree",
+    "pixi search",
+    "pixi info",
+    "pixi clean",
+    "pixi auth",
+    "pixi config",
+    "pixi completion",
+    "pixi upload"
+  ]
+}
